@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Число альфа — интерактивная презентация</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04020e;
+  --glass:rgba(255,255,255,.055);
+  --glass-strong:rgba(255,255,255,.09);
+  --stroke:rgba(255,255,255,.14);
+  --stroke-bright:rgba(140,190,255,.35);
+  --txt:#eef2ff;
+  --dim:#9aa6c8;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Plus Jakarta Sans',sans-serif;
+  --blue:#3d7bff;
+  --cyan:#59e6ff;
+  --violet:#a06bff;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:var(--sans);color:var(--txt)}
+#app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{position:relative;width:1600px;height:900px;transform-origin:center center;flex:none}
+#webgl{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+#fx{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 4px),
+    radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(2,0,12,.55) 100%);
+  mix-blend-mode:overlay;}
+#fx2{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");}
+
+/* ---------- HUD frame ---------- */
+.hud-corner{position:absolute;width:34px;height:34px;z-index:6;pointer-events:none;opacity:.55}
+.hud-corner::before,.hud-corner::after{content:'';position:absolute;background:linear-gradient(90deg,var(--cyan),transparent)}
+.hud-corner.tl{top:26px;left:26px;border-top:1px solid var(--stroke-bright);border-left:1px solid var(--stroke-bright)}
+.hud-corner.tr{top:26px;right:26px;border-top:1px solid var(--stroke-bright);border-right:1px solid var(--stroke-bright)}
+.hud-corner.bl{bottom:26px;left:26px;border-bottom:1px solid var(--stroke-bright);border-left:1px solid var(--stroke-bright)}
+.hud-corner.br{bottom:26px;right:26px;border-bottom:1px solid var(--stroke-bright);border-right:1px solid var(--stroke-bright)}
+#hud-meta{position:absolute;left:34px;bottom:34px;z-index:6;font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--dim);pointer-events:none;text-transform:uppercase}
+#hud-meta b{color:var(--cyan);font-weight:500}
+#hud-right{position:absolute;right:34px;top:34px;z-index:6;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--dim);text-align:right;pointer-events:none}
+#progress-wrap{position:absolute;left:34px;top:40px;z-index:6;width:220px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+#progress{height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--cyan));box-shadow:0 0 12px var(--cyan);border-radius:2px}
+
+/* ---------- Slides ---------- */
+.slide{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;padding:90px 120px;gap:26px}
+.slide.active{display:flex}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.4em;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:14px}
+.kicker::before{content:'';width:44px;height:1px;background:linear-gradient(90deg,transparent,var(--cyan))}
+h1.title{font-size:64px;font-weight:800;line-height:1.05;letter-spacing:-.02em;text-align:center;
+  background:linear-gradient(180deg,#fff 30%,#9db4ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 80px rgba(61,123,255,.35);max-width:1100px}
+h2.title{font-size:48px;font-weight:800;line-height:1.08;letter-spacing:-.02em;text-align:center;
+  background:linear-gradient(180deg,#fff 30%,#9db4ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:1150px}
+.sub{font-size:19px;font-weight:400;color:var(--dim);text-align:center;max-width:760px;line-height:1.65}
+.sub b{color:var(--txt);font-weight:600}
+.mono{font-family:var(--mono)}
+
+/* glass */
+.glass{position:relative;background:var(--glass);backdrop-filter:blur(25px) saturate(150%);-webkit-backdrop-filter:blur(25px) saturate(150%);
+  border:1px solid var(--stroke);border-radius:22px;
+  box-shadow:0 24px 70px rgba(0,0,20,.55),inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(255,255,255,.04)}
+.glass::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(120deg,rgba(255,255,255,.14) 0%,transparent 22%,transparent 78%,rgba(140,190,255,.10) 100%)}
+.glass::after{content:'';position:absolute;left:8%;right:8%;top:0;height:1px;border-radius:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent)}
+
+/* ---------- Slide 1 ---------- */
+#s1{justify-content:space-between;padding-top:110px;padding-bottom:96px}
+#s1 .headline{font-size:52px;font-weight:800;text-align:center;line-height:1.1;letter-spacing:-.015em;max-width:1000px;
+  background:linear-gradient(180deg,#fff 20%,#8fb0ff 95%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 90px rgba(61,123,255,.4)}
+.alpha-big{font-family:var(--mono);font-weight:700;font-size:150px;letter-spacing:-.02em;line-height:1;
+  color:#eaf4ff;text-shadow:0 0 18px rgba(89,230,255,.9),0 0 60px rgba(61,123,255,.75),0 0 140px rgba(160,107,255,.5);
+  animation:pulseGlow 4.2s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{text-shadow:0 0 18px rgba(89,230,255,.9),0 0 60px rgba(61,123,255,.75),0 0 140px rgba(160,107,255,.5)}
+ 50%{text-shadow:0 0 26px rgba(89,230,255,1),0 0 95px rgba(61,123,255,.95),0 0 190px rgba(160,107,255,.75)}}
+.alpha-tag{font-family:var(--mono);font-size:12px;letter-spacing:.5em;color:var(--cyan);text-transform:uppercase;opacity:.85}
+
+/* ---------- generic columns ---------- */
+.cols{display:flex;gap:26px;width:100%;max-width:1240px;align-items:stretch}
+.col{flex:1;padding:30px 30px 28px;display:flex;flex-direction:column;gap:14px;min-height:200px}
+.col h3{font-size:20px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.col h3 .n{font-family:var(--mono);font-size:12px;color:var(--cyan);border:1px solid var(--stroke-bright);border-radius:6px;padding:3px 8px}
+.col p{font-size:14.5px;line-height:1.7;color:var(--dim)}
+.col p b{color:var(--txt);font-weight:600}
+.col .f{margin-top:auto;font-family:var(--mono);font-size:13px;color:var(--cyan);letter-spacing:.05em}
+
+.panel{max-width:980px;padding:34px 44px}
+.panel p{font-size:16.5px;line-height:1.8;color:var(--dim)}
+.panel p+p{margin-top:14px}
+.panel p b{color:var(--txt);font-weight:600}
+.quote{border-left:2px solid var(--cyan);padding:6px 0 6px 20px;font-family:var(--mono);font-size:15px;color:#cfe6ff;line-height:1.7;margin-top:6px}
+
+/* formula */
+.formula-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:36px 64px}
+.formula{font-family:var(--mono);font-size:44px;font-weight:500;color:#eaf4ff;letter-spacing:.01em;text-align:center;
+  text-shadow:0 0 30px rgba(89,230,255,.45)}
+.formula .hl{color:var(--cyan);text-shadow:0 0 24px rgba(89,230,255,.9)}
+.formula-sub{font-family:var(--mono);font-size:14px;color:var(--dim);letter-spacing:.06em}
+
+/* hypothesis cards */
+.hgrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;width:100%;max-width:1180px}
+.hcard{padding:26px 30px;cursor:pointer;transition:transform .35s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d;will-change:transform;min-height:150px}
+.hcard h3{font-size:19px;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:12px}
+.hcard h3 span.ic{font-family:var(--mono);font-size:12px;color:var(--cyan);border:1px solid var(--stroke-bright);border-radius:7px;padding:4px 9px}
+.hcard p{font-size:14px;line-height:1.65;color:var(--dim)}
+.hcard:hover{border-color:var(--stroke-bright)}
+
+/* final plaque */
+.plaque{padding:44px 80px;text-align:center;display:flex;flex-direction:column;gap:12px;
+  box-shadow:0 30px 100px rgba(61,123,255,.25),inset 0 1px 0 rgba(255,255,255,.2)}
+.plaque .big{font-size:40px;font-weight:800;letter-spacing:-.01em;
+  background:linear-gradient(90deg,var(--cyan),#fff,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 30px rgba(89,230,255,.4))}
+.plaque .sm{font-family:var(--mono);font-size:12px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase}
+
+/* sources */
+.src-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;max-width:1100px}
+.src{padding:20px 26px;display:flex;gap:16px;align-items:flex-start}
+.src .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;color:var(--cyan);border:1px solid var(--stroke-bright);border-radius:6px;padding:4px 8px;flex:none;margin-top:2px;text-transform:uppercase}
+.src h4{font-size:15.5px;font-weight:700;line-height:1.35}
+.src p{font-size:12.5px;color:var(--dim);margin-top:5px;line-height:1.55}
+
+/* nav */
+#nav{position:absolute;right:34px;bottom:30px;z-index:7;display:flex;align-items:center;gap:14px}
+.navbtn{width:46px;height:46px;border-radius:50%;border:1px solid var(--stroke);background:var(--glass);backdrop-filter:blur(20px);
+  color:var(--txt);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.25s;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+.navbtn:hover{border-color:var(--stroke-bright);box-shadow:0 0 22px rgba(89,230,255,.35),inset 0 1px 0 rgba(255,255,255,.2);color:var(--cyan)}
+#counter{font-family:var(--mono);font-size:13px;letter-spacing:.2em;color:var(--dim)}
+#counter b{color:var(--txt);font-weight:500}
+#dots{position:absolute;left:50%;transform:translateX(-50%);bottom:34px;z-index:7;display:flex;gap:9px}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;transition:.3s}
+.dot.on{background:var(--cyan);box-shadow:0 0 12px var(--cyan);transform:scale(1.35)}
+#hint{position:absolute;bottom:34px;right:110px;z-index:7;font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--dim);opacity:.7}
+.two-col{display:flex;gap:30px;max-width:1240px;width:100%;align-items:stretch}
+.two-col .panel{flex:1.25;max-width:none}
+.side-stat{flex:1;padding:30px 34px;display:flex;flex-direction:column;gap:16px;justify-content:center}
+.stat-row{display:flex;flex-direction:column;gap:4px}
+.stat-row .v{font-family:var(--mono);font-size:26px;color:var(--cyan);text-shadow:0 0 20px rgba(89,230,255,.5)}
+.stat-row .k{font-size:12.5px;color:var(--dim);letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="webgl"></canvas>
+    <div id="fx"></div><div id="fx2"></div>
+    <div class="hud-corner tl"></div><div class="hud-corner tr"></div>
+    <div class="hud-corner bl"></div><div class="hud-corner br"></div>
+    <div id="progress-wrap"><div id="progress"></div></div>
+    <div id="hud-right">CONST // FINE-STRUCTURE<br>SESSION 2026.10.31 · LAB.GLASS</div>
+    <div id="hud-meta"><b id="meta-slide">01</b> / 11 · <span id="meta-name">ИНИЦИАЛИЗАЦИЯ</span></div>
+    <div id="hint">← → ЛИСТАТЬ</div>
+    <div id="counter"><b>01</b> / 11</div>
+    <div id="nav">
+      <button class="navbtn" id="prev">←</button>
+      <button class="navbtn" id="next">→</button>
+    </div>
+    <div id="dots"></div>
+
+    <!-- SLIDE 1 -->
+    <section class="slide" id="s1">
+      <div class="kicker">Квантовое расследование · доклад</div>
+      <h1 class="headline">Число альфа:<br>почему от него зависит Вселенная</h1>
+      <div class="alpha-big" id="alphaBig">1/137</div>
+      <div class="alpha-tag">α — ПОСТОЯННАЯ ТОНКОЙ СТРУКТУРЫ</div>
+      <p class="sub">Простое исследование одной из главных загадок физики.<br><b>Архивное погружение</b>: лабораторные данные, истории великих и граница познания.</p>
+    </section>
+
+    <!-- SLIDE 2 -->
+    <section class="slide" id="s2">
+      <div class="kicker">Пролог · история</div>
+      <h2 class="title">Одержимость великих физиков числом 137</h2>
+      <div class="two-col">
+        <div class="glass panel">
+          <p>Мотивация этого расследования — <b>личная</b>: число 1/137 преследовало физику XX века. <b>Артур Эддингтон</b> пытался вывести его чисто теоретически и пришёл к «числу протонов во Вселенной» — <span class="mono">N = 136·2⁵⁶</span>, чтобы получить заветные 137.</p>
+          <p><b>Вольфганг Паули</b>, один из создателей квантовой механики, всю жизнь безуспешно искал математическое происхождение α. По легенде, оказавшись в цюрихской клинике, он был помещён в <b>палату № 137</b> — и понял: это знак конца. Он умер именно в этой палате.</p>
+          <div class="quote">«Есть что-то странное в числе 137…<br>Я не понимаю, откуда оно берётся». — В. Паули</div>
+        </div>
+        <div class="glass side-stat">
+          <div class="stat-row"><div class="v">1916</div><div class="k">Арнольд Зоммерфельд вводит α при объяснении тонкой структуры спектров</div></div>
+          <div class="stat-row"><div class="v">1929</div><div class="k">Паули: «Эддингтон — современный Аристотель… но за α он отвечать не может»</div></div>
+          <div class="stat-row"><div class="v">1958</div><div class="k">Палата 137, клиника Цюриха. Конец расследования Паули</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3 -->
+    <section class="slide" id="s3">
+      <div class="kicker">Определение</div>
+      <h2 class="title">Что такое постоянная тонкой структуры (α)</h2>
+      <div class="glass formula-wrap">
+        <div class="formula">α = e² / 4πε₀ħc ≈ <span class="hl">1/137</span></div>
+        <div class="formula-sub">e — заряд электрона · ħ — постоянная Планка · c — скорость света · ε₀ — электрическая постоянная</div>
+      </div>
+      <div class="cols">
+        <div class="glass col"><h3><span class="n">01</span>Сила взаимодействия</h3><p>α — это <b>порядковая величина силы электромагнитного взаимодействия</b>: насколько сильно заряженные частицы тянутся или отталкиваются друг от друга.</p></div>
+        <div class="glass col"><h3><span class="n">02</span>Удержание электронов</h3><p>Именно α определяет, насколько прочно электрон <b>привязан к ядру атома</b> и какие орбиты ему разрешены.</p></div>
+        <div class="glass col"><h3><span class="n">03</span>Квантовые переходы</h3><p>При скачках электронов между уровнями рождается свет: α задаёт <b>частоты спектральных линий</b> — цвет всей химии.</p></div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4 -->
+    <section class="slide" id="s4">
+      <div class="kicker">Архитектура материи</div>
+      <h2 class="title">Почему атомы важны</h2>
+      <div class="cols">
+        <div class="glass col"><h3><span class="n">A</span>Структура мира</h3><p>Вода, воздух, тела, звёзды — всё это <b>химия электронных оболочек</b>. Свойства каждого элемента таблицы Менделеева записаны в конфигурации электронов, а она диктуется α.</p><div class="f">H₂O · O₂ · C₆H₁₂O₆ — следы α</div></div>
+        <div class="glass col"><h3><span class="n">B</span>Радиусы орбит</h3><p>Размер атома (~10⁻¹⁰ м) — итог баланса <b>кулоновского притяжения</b> и квантовых правил. Поменяйте α — и атомы станут в разы больше или рухнут в ядра.</p><div class="f">a₀ = ħ² / m e² · (зависит от α)</div></div>
+        <div class="glass col"><h3><span class="n">C</span>Плотность бытия</h3><p>Непроницаемость твёрдого тела — электромагнитное отталкивание оболочек плюс принцип Паули. Благодаря этому <b>материя «занимает место»</b>, а не схлопывается в точку.</p><div class="f">solid state ⟸ EM repulsion</div></div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5 -->
+    <section class="slide" id="s5">
+      <div class="kicker">Мысленный эксперимент · I</div>
+      <h2 class="title">Если альфа была бы слабее</h2>
+      <div class="cols">
+        <div class="glass col"><h3><span class="n">01</span>Ослабление притяжения</h3><p>Электроны слабее связаны с ядрами, атомы раздуваются, энергии связи падают. Химические связи становятся <b>хрупкими и короткоживущими</b>.</p></div>
+        <div class="glass col"><h3><span class="n">02</span>Расад оболочек</h3><p>Стабильные электронные конфигурации разрушаются: молекулы разваливаются при малейшем нагреве, <b>сложная химия исчезает</b> первой.</p></div>
+        <div class="glass col"><h3><span class="n">03</span>Разреженное облако</h3><p>Материя перестаёт структурироваться: вместо жидкостей и твёрдых тел — <b>холодное разреженное облако</b> слабо связанных атомов. Ни жизни, ни звёздного металла.</p></div>
+      </div>
+      <p class="sub" style="font-size:16px">Даже небольшое снижение α делает ковалентные связи недостаточно прочными для молекул ДНК и белков.</p>
+    </section>
+
+    <!-- SLIDE 6 -->
+    <section class="slide" id="s6">
+      <div class="kicker">Мысленный эксперимент · II</div>
+      <h2 class="title">Если альфа была бы сильнее</h2>
+      <div class="cols">
+        <div class="glass col"><h3><span class="n">01</span>Экстремальное притяжение</h3><p>Кулоновская сила растёт как 1/α. Электроны стягиваются вплотную к ядру, атомы сжимаются до <b>несравнимо меньших размеров</b>.</p></div>
+        <div class="glass col"><h3><span class="n">02</span>Затягивание в ядра</h3><p>При достаточно большом α электрон падает на ядро: <b>процесс электронного захвата</b> съедает атомы целиком. Материя без электронов — плазма ядер.</p></div>
+        <div class="glass col"><h3><span class="n">03</span>Химия останавливается</h3><p>Изменяется и термоядерный синтез в звёздах: иные пороги реакций, иной путь к углероду. Слишком сильная α — <b>ни звёзд, ни наблюдателей</b>.</p></div>
+      </div>
+      <p class="sub" style="font-size:16px">Вселенная существует в узкой полосе: α чуть больше — материя сжигается, чуть меньше — рассыпается.</p>
+    </section>
+
+    <!-- SLIDE 7 -->
+    <section class="slide" id="s7">
+      <div class="kicker">Космология</div>
+      <h2 class="title">Проблема тонкой настройки Вселенной</h2>
+      <div class="two-col">
+        <div class="glass panel">
+          <p>Фундаментальные параметры природы — α, массы частиц, константы ядерных сил — словно зафиксированы в <b>узких рамках</b>, внутри которых возможны звёзды, химия и наблюдатели.</p>
+          <p>Измените α на несколько процентов — и <b>углерод не синтезируется в звёздах</b>, водород не горит устойчиво, атомы не удерживают электроны. Это не мистика, а честный физический факт: <b>наша Вселенная устроена тонко</b>, и наука пока не знает, почему именно так.</p>
+          <div class="quote">«Мы наблюдаем Вселенную, потому что параметры позволяют появиться наблюдателям». — антропный принцип, без мистики</div>
+        </div>
+        <div class="glass side-stat">
+          <div class="stat-row"><div class="v">±3–4%</div><div class="k">допустимое окно изменения α для устойчивого существования химии и звёздного синтеза (порядок оценки)</div></div>
+          <div class="stat-row"><div class="v">4 силы</div><div class="k">значения констант которых согласованы настолько, что рождается структура</div></div>
+          <div class="stat-row"><div class="v">?</div><div class="k">известный механизм, определяющий численное значение α, — отсутствует</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 8 -->
+    <section class="slide" id="s8">
+      <div class="kicker">Теоретический фронтир</div>
+      <h2 class="title">Четыре гипотезы теоретиков</h2>
+      <div class="hgrid">
+        <div class="glass hcard"><h3><span class="ic">H1</span>Глубокая теория</h3><p>За Стандартной моделью скрывается единая теория (струны, петлевая гравитация), в которой α <b>выводится</b>, как выводится π из геометрии. Задача — найти её.</p></div>
+        <div class="glass hcard"><h3><span class="ic">H2</span>Квантовый сбой</h3><p>При рождении Вселенной симметрия спонтанно нарушилась случайно — как направление магнитной стрелки. α — это <b>замороженный квантовый выбор</b>, не имеющий «причины».</p></div>
+        <div class="glass hcard"><h3><span class="ic">H3</span>Мультивселенная</h3><p>В множестве пузырей-вселенных с разными константами мы неизбежно окажемся в той, где α допускает <b>наблюдателей</b>. Отбор, а не чудо.</p></div>
+        <div class="glass hcard"><h3><span class="ic">H4</span>Философский порядок</h3><p>Возможно, математика природы фундаментальна: вселенная устроена так, потому что иначе <b>не могла быть устроена</b>. Принцип, а не механизм.</p></div>
+      </div>
+    </section>
+
+    <!-- SLIDE 9 -->
+    <section class="slide" id="s9">
+      <div class="kicker">Дисциплина мышления</div>
+      <h2 class="title">Что важно не перепутать</h2>
+      <div class="cols">
+        <div class="glass col"><h3><span class="n">✕</span>Миф</h3><p>«α — секретный шифр Вселенной, код Матрицы, число Бога». За этим стоит желание <b>приписать мистическое предназначение</b> чисто физической величине.</p><div class="f">numerology ≠ physics</div></div>
+        <div class="glass col"><h3><span class="n">✓</span>Факт</h3><p>α — <b>строго измеряемая константа</b>: лаборатории мира (NIST, CODATA) фиксируют её значение с точностью до 10⁻¹⁰ и проверяют стабильность год за годом.</p><div class="f">α⁻¹ = 137.035999084(21)</div></div>
+        <div class="glass col"><h3><span class="n">→</span>Открытый вопрос</h3><p>Неизвестно <b>происхождение</b> значения α — это честная граница знания, а не окно для эзотерики. Между «не знаем» и «невозможно познать» — пропасть.</p><div class="f">unknown ≠ unknowable</div></div>
+      </div>
+    </section>
+
+    <!-- SLIDE 10 -->
+    <section class="slide" id="s10">
+      <div class="kicker">Финал расследования</div>
+      <h2 class="title">Великая граница познания</h2>
+      <div class="glass panel" style="max-width:1050px">
+        <p>Это расследование приводит к неудобному выводу: число альфа — <b>не просто константа</b>. Это рубеж, где точнейшие измерения человечества, самая строгая математика и самые смелые теории <b>упираются в открытый фундаментальный вопрос</b>: почему природа выбрала именно это число?</p>
+        <p>1/137 стоит на стыке двух миров: оно измерено до десятого знака — и не объяснено ни одной строкой. Паули не смог. Эддингтон не смог. Возможно, следующий Паули уже учится физике — и у него будет палата обычного номера, но необычный вопрос.</p>
+      </div>
+      <div class="glass plaque">
+        <div class="big">1/137 — маленькое число с огромным вопросом</div>
+        <div class="sm">the fine-structure frontier</div>
+      </div>
+    </section>
+
+    <!-- SLIDE 11 -->
+    <section class="slide" id="s11">
+      <div class="kicker">Архив · источники</div>
+      <h2 class="title">Источники и архивы данных</h2>
+      <div class="src-grid">
+        <div class="glass src"><span class="tag">NIST</span><div><h4>CODATA Internationally Recommended Values</h4><p>Точные значения фундаментальных констант, включая α⁻¹ = 137.035999084(21) · physics.nist.gov</p></div></div>
+        <div class="glass src"><span class="tag">CERN</span><div><h4>CERN Courier & Archive</h4><p>Исторические материалы о тонкой структуре спектров и квантовой электродинамике · cerncourier.com</p></div></div>
+        <div class="glass src"><span class="tag">BOOK</span><div><h4>Абрахам Пайс. «Inward Bound» (1986)</h4><p>Классический историко-научный труд о рождении квантовой физики и роли α</p></div></div>
+        <div class="glass src"><span class="tag">BOOK</span><div><h4>Артур Миллер. «137: Jung, Pauli and the Pursuit of a Scientific Obsession»</h4><p>Биографическое расследование одержимости Паули и Эддингтона числом 137</p></div></div>
+        <div class="glass src"><span class="tag">BOOK</span><div><h4>Хелге Краг. «Quantum Generations» (1999)</h4><p>История квантовой теории и проблемы фундаментальных констант</p></div></div>
+        <div class="glass src"><span class="tag">LECTURE</span><div><h4>Р. Фейнман. «QED: The Strange Theory of Light and Matter»</h4><p>Нобелевские лекции об электромагнитном взаимодействии, где α — главный герой</p></div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+/* ================= STAGE FIT ================= */
+const stage = document.getElementById('stage');
+function fit(){
+  const s = Math.min(window.innerWidth/1600, window.innerHeight/900)*0.98;
+  stage.style.transform = `scale(${s})`;
+}
+window.addEventListener('resize', fit); fit();
+
+/* ================= THREE.JS SCENE ================= */
+const canvas = document.getElementById('webgl');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, 16/9, .1, 300);
+camera.position.set(0,0,9);
+
+/* nebula plane */
+const nebulaUniforms = { uTime:{value:0}, uRes:{value:new THREE.Vector2(1600,900)} };
+const nebula = new THREE.Mesh(
+  new THREE.PlaneGeometry(320,180),
+  new THREE.ShaderMaterial({
+    uniforms: nebulaUniforms, depthWrite:false,
+    vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader:`
+      varying vec2 vUv; uniform float uTime;
+      float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+      float noise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
+        return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+      float fbm(vec2 p){ float v=0.,a=.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.05; a*=.5; } return v; }
+      void main(){
+        vec2 uv = vUv*3.0;
+        float t = uTime*0.03;
+        float n1 = fbm(uv + vec2(t*.7, -t*.4));
+        float n2 = fbm(uv*1.6 - vec2(t*.5, t*.6) + n1);
+        vec3 base = vec3(0.012,0.006,0.045);
+        vec3 indigo = vec3(0.09,0.07,0.42);
+        vec3 violet = vec3(0.32,0.10,0.48);
+        vec3 cyan = vec3(0.05,0.45,0.65);
+        vec3 col = base + indigo*smoothstep(.35,.8,n1) + violet*smoothstep(.5,.9,n2)*.8 + cyan*pow(n1*n2,2.2)*1.6;
+        float vig = smoothstep(1.25,.35,length(vUv-.5));
+        col *= vig;
+        col += hash(vUv*vec2(1920.,1080.)+uTime)*0.015;
+        gl_FragColor = vec4(col,1.);
+      }`
+  })
+);
+nebula.position.z = -60;
+scene.add(nebula);
+
+/* glow sprite texture */
+function makeGlow(color){
+  const c = document.createElement('canvas'); c.width=c.height=128;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(64,64,0,64,64,64);
+  grd.addColorStop(0, color); grd.addColorStop(.25, color.replace('1)','.5)'));
+  grd.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=grd; g.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+const glowCyan = makeGlow('rgba(89,230,255,1)');
+const glowBlue = makeGlow('rgba(61,123,255,1)');
+
+/* starfield */
+function makeStars(n, size, spread, z){
+  const pos = new Float32Array(n*3);
+  for(let i=0;i<n*3;i++) pos[i] = (Math.random()-.5)*spread;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({size, map:glowCyan, transparent:true, opacity:.75,
+    blending:THREE.AdditiveBlending, depthWrite:false, color:0x8fb8ff});
+  const p = new THREE.Points(geo,mat); p.position.z = z; return p;
+}
+const stars1 = makeStars(900,.09,90,-25); scene.add(stars1);
+const stars2 = makeStars(500,.16,70,-10); scene.add(stars2);
+
+/* dust reacting to mouse */
+const dustN = 260;
+const dustPos = new Float32Array(dustN*3);
+for(let i=0;i<dustN*3;i++) dustPos[i]=(Math.random()-.5)*18;
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos,3));
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({size:.07,map:glowBlue,transparent:true,opacity:.5,
+  blending:THREE.AdditiveBlending,depthWrite:false,color:0x59e6ff}));
+scene.add(dust);
+
+/* atom */
+const atom = new THREE.Group(); scene.add(atom);
+const nucleus = new THREE.Group();
+nucleus.add(new THREE.Mesh(new THREE.IcosahedronGeometry(.55,1),
+  new THREE.MeshBasicMaterial({color:0x59e6ff,wireframe:true,transparent:true,opacity:.85})));
+const nucCore = new THREE.Mesh(new THREE.SphereGeometry(.3,24,24),
+  new THREE.MeshBasicMaterial({color:0xbfe9ff}));
+nucleus.add(nucCore);
+const nucGlow = new THREE.Sprite(new THREE.SpriteMaterial({map:glowCyan,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));
+nucGlow.scale.set(2.4,2.4,1); nucleus.add(nucGlow);
+atom.add(nucleus);
+
+const rings = [];
+const ringCfg = [
+  {r:2.2, rot:[1.2,.3,0], speed:1.6, tilt:.25},
+  {r:2.9, rot:[-.7,1.1,.4], speed:-1.15, tilt:.2},
+  {r:3.55, rot:[.4,-.5,1.3], speed:.9, tilt:.15},
+];
+ringCfg.forEach((cfg,i)=>{
+  const g = new THREE.Group();
+  g.rotation.set(...cfg.rot);
+  const pts = new THREE.EllipseCurve(0,0,cfg.r,cfg.r).getPoints(90);
+  const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0x3d7bff,transparent:true,opacity:.35}));
+  g.add(line);
+  const e = new THREE.Group();
+  const es = new THREE.Mesh(new THREE.SphereGeometry(.09,16,16), new THREE.MeshBasicMaterial({color:0x9ff0ff}));
+  const eg = new THREE.Sprite(new THREE.SpriteMaterial({map:glowCyan,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));
+  eg.scale.set(1.1,1.1,1); e.add(es); e.add(eg);
+  g.add(e);
+  atom.add(g);
+  rings.push({group:g, electron:e, ...cfg, angle:Math.random()*6.28});
+});
+/* faint quantum orbital shell */
+const shell = new THREE.Mesh(new THREE.SphereGeometry(4.3,32,32),
+  new THREE.MeshBasicMaterial({color:0xa06bff,wireframe:true,transparent:true,opacity:.05}));
+atom.add(shell);
+
+/* mood per slide */
+const moods = [
+  {speed:1.0, atomRot:.12, scale:1.0,  color:0x59e6ff, op:.5},   // 1
+  {speed:.45, atomRot:.05, scale:1.25, color:0xa06bff, op:.35},  // 2
+  {speed:1.2, atomRot:.15, scale:1.0,  color:0x59e6ff, op:.5},   // 3
+  {speed:1.0, atomRot:.1,  scale:1.15, color:0x3d7bff, op:.4},   // 4
+  {speed:.5,  atomRot:.04, scale:1.6,  color:0x8fb0ff, op:.3},   // 5
+  {speed:2.2, atomRot:.3,  scale:.7,   color:0xffb86b, op:.6},   // 6
+  {speed:1.5, atomRot:.2,  scale:1.3,  color:0xa06bff, op:.45},  // 7
+  {speed:.9,  atomRot:.12, scale:1.0,  color:0x59ffc8, op:.5},   // 8
+  {speed:.6,  atomRot:.06, scale:1.2,  color:0x9ff0ff, op:.35},  // 9
+  {speed:1.8, atomRot:.25, scale:1.1,  color:0x59e6ff, op:.7},   // 10
+  {speed:.4,  atomRot:.03, scale:1.5,  color:0x8fb0ff, op:.3},   // 11
+];
+const mood = {speed:1, atomRot:.12, scale:1, color:new THREE.Color(0x59e6ff), op:.5};
+const targetColor = new THREE.Color();
+
+/* mouse */
+const mouse = {x:0,y:0,tx:0,ty:0};
+window.addEventListener('mousemove', e=>{
+  mouse.tx = (e.clientX/window.innerWidth-.5)*2;
+  mouse.ty = -(e.clientY/window.innerHeight-.5)*2;
+});
+
+/* ================= LOOP ================= */
+const clock = new THREE.Clock();
+function tick(){
+  const dt = Math.min(clock.getDelta(), .05);
+  const t = clock.elapsedTime;
+  nebulaUniforms.uTime.value = t;
+  mouse.x += (mouse.tx-mouse.x)*.045;
+  mouse.y += (mouse.ty-mouse.y)*.045;
+  camera.position.x = mouse.x*.9;
+  camera.position.y = mouse.y*.6;
+  camera.lookAt(0,0,0);
+
+  stars1.rotation.y = t*.008; stars2.rotation.y = -t*.012;
+  dust.rotation.y = t*.02;
+  dust.position.x = mouse.x*.7; dust.position.y = mouse.y*.5;
+
+  atom.rotation.y += dt*mood.atomRot;
+  atom.rotation.x = Math.sin(t*.3)*.12 + mouse.y*.15;
+  atom.scale.setScalar(mood.scale*(1+Math.sin(t*.8)*.02));
+  atom.position.x = mouse.x*.5; atom.position.y = mouse.y*.35;
+  const s3 = mood.speed*(1 + Math.abs(mouse.x)*.8);
+  rings.forEach(r=>{
+    r.angle += dt*r.speed*s3;
+    r.electron.position.set(Math.cos(r.angle)*r.r, Math.sin(r.angle)*r.r, 0);
+    r.group.rotation.z += dt*r.tilt*.3;
+  });
+  nucGlow.material.opacity = .6 + Math.sin(t*2.4)*.25;
+  nucCore.scale.setScalar(1+Math.sin(t*3)*.1);
+  shell.material.opacity = .04 + mood.op*.12;
+  shell.rotation.y = t*.05;
+
+  renderer.render(scene,camera);
+  requestAnimationFrame(tick);
+}
+renderer.setSize(1600,900,false);
+tick();
+
+/* ================= SLIDE ENGINE ================= */
+const slides = [...document.querySelectorAll('.slide')];
+const N = slides.length;
+const names = ['ТИТУЛЬНЫЙ','ОДЕРЖИМОСТЬ 137','ЧТО ТАКОЕ Α','АРХИТЕКТУРА МАТЕРИИ','СЦЕНАРИЙ РАЗРЕЖЕНИЯ','СЦЕНАРИЙ СЖАТИЯ','ТОНКАЯ НАСТРОЙКА','4 ГИПОТЕЗЫ','ФАКТЫ VS МИСТИКА','ГРАНИЦА ПОЗНАНИЯ','ИСТОЧНИКИ'];
+let current = -1, animating = false;
+
+const dotsWrap = document.getElementById('dots');
+slides.forEach((_,i)=>{
+  const d = document.createElement('div'); d.className='dot';
+  d.onclick = ()=>goTo(i); dotsWrap.appendChild(d);
+});
+const dots = [...document.querySelectorAll('.dot')];
+const counterEl = document.querySelector('#counter b');
+const metaSlide = document.getElementById('meta-slide');
+const metaName = document.getElementById('meta-name');
+const progress = document.getElementById('progress');
+
+function updateChrome(i){
+  counterEl.textContent = String(i+1).padStart(2,'0');
+  metaSlide.textContent = String(i+1).padStart(2,'0');
+  metaName.textContent = names[i];
+  progress.style.width = ((i+1)/N*100)+'%';
+  dots.forEach((d,j)=>d.classList.toggle('on', j===i));
+}
+
+function applyMood(i){
+  const m = moods[i];
+  gsap.to(mood, {speed:m.speed, atomRot:m.atomRot, scale:m.scale, op:m.op, duration:1.8, ease:'power2.inOut'});
+  targetColor.set(m.color);
+  rings.forEach(r=>{
+    r.electron.children[0].material.color.lerp(targetColor,.9);
+    r.electron.children[1].material.color.lerp(targetColor,.9);
+  });
+}
+
+function goTo(i, instant=false){
+  if(animating || i===current || i<0 || i>=N) return;
+  const prev = current; current = i;
+  updateChrome(i); applyMood(i);
+  const inn = slides[i];
+  inn.classList.add('active');
+  if(instant){
+    slides.forEach((s,j)=>{ if(j!==i) s.classList.remove('active'); });
+    return;
+  }
+  animating = true;
+  const out = prev>=0 ? slides[prev] : null;
+  const tl = gsap.timeline({onComplete:()=>{ animating=false; if(out) out.classList.remove('active'); }});
+  if(out){
+    tl.to(out.children, {y:-46, opacity:0, filter:'blur(12px)', duration:.4, stagger:.05, ease:'power3.in'})
+      .to(out, {opacity:0, duration:.25}, '-=.15');
+  }
+  tl.fromTo(inn, {opacity:0}, {opacity:1, duration:.35})
+    .fromTo(inn.children, {y:64, opacity:0, filter:'blur(14px)'},
+      {y:0, opacity:1, filter:'blur(0px)', duration:.75, stagger:.07, ease:'power3.out'}, '<.05');
+}
+document.getElementById('next').onclick = ()=>goTo(current+1);
+document.getElementById('prev').onclick = ()=>goTo(current-1);
+window.addEventListener('keydown', e=>{
+  if(['ArrowRight','PageDown',' '].includes(e.key)) goTo(current+1);
+  if(['ArrowLeft','PageUp'].includes(e.key)) goTo(current-1);
+  if(e.key==='Home') goTo(0);
+  if(e.key==='End') goTo(N-1);
+});
+let wheelLock = false;
+window.addEventListener('wheel', e=>{
+  if(wheelLock || animating) return;
+  wheelLock = true; setTimeout(()=>wheelLock=false, 1200);
+  if(Math.abs(e.deltaY)<20) return;
+  goTo(current + (e.deltaY>0?1:-1));
+},{passive:true});
+let touchY=null;
+window.addEventListener('touchstart', e=>touchY=e.touches[0].clientY,{passive:true});
+window.addEventListener('touchend', e=>{
+  if(touchY===null) return;
+  const dy = touchY - e.changedTouches[0].clientY;
+  if(Math.abs(dy)>50) goTo(current+(dy>0?1:-1));
+  touchY=null;
+},{passive:true});
+
+/* card tilt */
+document.querySelectorAll('.hcard').forEach(card=>{
+  card.addEventListener('mousemove', e=>{
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+    card.style.transform = `perspective(900px) rotateY(${x*10}deg) rotateX(${-y*10}deg) translateZ(8px)`;
+  });
+  card.addEventListener('mouseleave', ()=>card.style.transform='perspective(900px)');
+});
+
+/* intro */
+updateChrome(0);
+goTo(0);
+gsap.fromTo('#alphaBig',{opacity:0,scale:.6},{opacity:1,scale:1,duration:1.6,ease:'elastic.out(1,.6)',delay:.6});
+</script>
+</body>
+</html>
