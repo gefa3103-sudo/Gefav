@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Геометрия близости — Интерактивная 3D-презентация</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <style>
+    :root {
+      --bg-void: #04020e;
+      --bg-deep: #070611;
+      --bg-indigo: #0a1030;
+      --bg-plum: #160d31;
+      --accent-cyan: #59e6ff;
+      --accent-cobalt: #3d7bff;
+      --accent-violet: #a06bff;
+      --accent-gold: #f6ca72;
+      --text-ice: #f3f7ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-void);
+      color: var(--text-ice);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      user-select: none;
+    }
+
+    #webgl-canvas, #fallback-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 0;
+    }
+
+    #fallback-canvas {
+      display: none;
+      background:
+        radial-gradient(circle at 72% 35%, rgba(61, 123, 255, 0.22), transparent 48%),
+        radial-gradient(circle at 22% 72%, rgba(160, 107, 255, 0.18), transparent 52%),
+        radial-gradient(circle at 50% 50%, #0a1030 0%, #070611 55%, #04020e 100%);
+    }
+
+    .stage-viewport {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .stage {
+      position: relative;
+      width: 1600px;
+      height: 900px;
+      transform-origin: center center;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(24px) saturate(150%);
+      -webkit-backdrop-filter: blur(24px) saturate(150%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 30px 90px rgba(0, 0, 20, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      pointer-events: auto;
+    }
+
+    .glass-lens {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(24px) saturate(150%);
+      -webkit-backdrop-filter: blur(24px) saturate(150%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 18px 48px rgba(0, 0, 20, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.28s ease, background 0.28s ease, opacity 0.28s ease;
+      pointer-events: auto;
+    }
+
+    .glass-lens:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.11);
+      border-color: rgba(89, 230, 255, 0.45);
+      transform: translateY(-1px) scale(1.04);
+    }
+
+    .glass-lens:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .glass-lens:disabled {
+      opacity: 0.32;
+      cursor: not-allowed;
+    }
+
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .headline-gradient {
+      background: linear-gradient(135deg, #f3f7ff 0%, #dce8ff 52%, #59e6ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .headline-gold {
+      background: linear-gradient(135deg, #f3f7ff 0%, #f6ca72 78%, #ff9b7a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .kicker-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent-cyan);
+    }
+
+    .kicker-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(89, 230, 255, 0.85);
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 76px 88px 116px 88px;
+      display: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .slide.is-active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .slide-body {
+      color: rgba(243, 247, 255, 0.82);
+      font-weight: 400;
+      line-height: 1.65;
+      letter-spacing: -0.005em;
+    }
+
+    .nav-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(243, 247, 255, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .nav-dot:hover {
+      background: rgba(89, 230, 255, 0.6);
+      transform: scale(1.25);
+    }
+
+    .nav-dot.active {
+      width: 28px;
+      background: linear-gradient(90deg, #59e6ff, #3d7bff);
+      border-color: rgba(255, 255, 255, 0.45);
+      box-shadow: 0 0 14px rgba(89, 230, 255, 0.55);
+    }
+
+    .task-card {
+      background: rgba(255, 255, 255, 0.055);
+      backdrop-filter: blur(22px) saturate(150%);
+      -webkit-backdrop-filter: blur(22px) saturate(150%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 24px 64px rgba(0, 0, 20, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease;
+      pointer-events: auto;
+    }
+
+    .task-card:hover {
+      border-color: rgba(89, 230, 255, 0.42);
+      transform: translateY(-3px);
+    }
+
+    /* Mobile vertical mode */
+    @media (max-width: 767px) {
+      .stage-viewport {
+        align-items: stretch;
+        justify-content: flex-start;
+      }
+      .stage {
+        width: 100vw !important;
+        height: 100dvh !important;
+        transform: none !important;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      .slide {
+        position: relative;
+        inset: auto;
+        min-height: calc(100dvh - 84px);
+        padding: 28px 18px 96px 18px;
+        flex-direction: column !important;
+        justify-content: flex-end !important;
+        align-items: stretch !important;
+      }
+      .slide-panel-width {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .desktop-hud-top {
+        padding: 16px 18px !important;
+      }
+      .desktop-hud-bottom {
+        padding: 14px 18px !important;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: 0.05s !important;
+        animation-duration: 0.05s !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="webgl-canvas" aria-hidden="true"></canvas>
+  <canvas id="fallback-canvas" aria-hidden="true"></canvas>
+
+  <div class="stage-viewport">
+    <main class="stage" id="stage" aria-live="polite">
+
+      <!-- Top Editorial HUD -->
+      <header class="desktop-hud-top absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-[88px] pt-[34px] pointer-events-none">
+        <div class="flex items-center gap-3">
+          <span class="inline-block w-2 h-2 rounded-full bg-[#59e6ff] shadow-[0_0_10px_#59e6ff]"></span>
+          <span class="font-mono-tech text-[11px] tracking-[0.2em] uppercase text-[#f3f7ff]/70">
+            VORONOI LAB // COMPUTATIONAL GEOMETRY
+          </span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="webgl-badge" class="hidden sm:inline-flex font-mono-tech text-[11px] tracking-[0.16em] uppercase px-3 py-1 rounded-full border border-white/15 bg-white/5 text-[#f3f7ff]/65">
+            WEBGL 3D
+          </span>
+          <div class="font-mono-tech text-[14px] tracking-[0.14em] text-[#f3f7ff]/90" aria-label="Номер слайда">
+            <span id="slide-counter-current" class="text-[#59e6ff] font-semibold">01</span>
+            <span class="text-white/30 mx-1">/</span>
+            <span class="text-white/55">11</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- SLIDE 1: Поле разбиения (Left Hero Asymmetric) -->
+      <section class="slide is-active items-center justify-start" data-slide="0" aria-label="Слайд 1 из 11">
+        <div class="slide-panel-width w-[46%] max-w-[680px] flex flex-col gap-6 pointer-events-auto">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Личное математическое расследование</span>
+          </div>
+          <h1 class="anim-item text-[44px] md:text-[52px] font-extrabold leading-[1.08] tracking-[-0.025em] headline-gradient">
+            Геометрия близости: как диаграмма Вороного оптимизирует реальный мир
+          </h1>
+          <div class="anim-item flex items-center gap-3">
+            <span class="font-mono-tech text-[13px] px-3.5 py-1.5 rounded-full bg-[#59e6ff]/12 border border-[#59e6ff]/40 text-[#59e6ff] tracking-[0.08em] shadow-[0_0_24px_rgba(89,230,255,0.18)]">
+              O(n log n)
+            </span>
+            <span class="font-mono-tech text-[12px] text-[#f3f7ff]/50 tracking-[0.12em] uppercase">
+              Сложность построения
+            </span>
+          </div>
+          <p class="anim-item slide-body text-[18px] max-w-[560px]">
+            От абстрактного разбиения плоскости до собственного алгоритма для решения бытовых и городских задач.
+          </p>
+        </div>
+      </section>
+
+      <!-- SLIDE 2: Поиск ближайшего (Right Glass Panel) -->
+      <section class="slide items-center justify-end" data-slide="1" aria-label="Слайд 2 из 11">
+        <div class="slide-panel-width w-[44%] max-w-[640px] glass-panel rounded-[28px] p-9 md:p-11 flex flex-col gap-5">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Точка отсчёта</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[38px] font-bold leading-[1.15] tracking-[-0.02em] headline-gradient">
+            Почему я заинтересовался разделением пространства?
+          </h2>
+          <p class="anim-item slide-body text-[16.5px]">
+            В повседневной жизни мы постоянно решаем одну задачу: куда ближе дойти, где поставить роутер или распределить ресурсы без очередей. Изучая вычислительную геометрию, я наткнулся на диаграмму Вороного — строгий способ делить территорию по принципу честной близости, и решил превратить эту математику в рабочий инструмент.
+          </p>
+          <div class="anim-item pt-2 flex items-center gap-3 font-mono-tech text-[12px] text-[#59e6ff]/80">
+            <span class="w-8 h-[1px] bg-[#59e6ff]/50"></span>
+            <span>НАВЕДИТЕ КУРСОР НА ПОЛЕ ДЛЯ ЗАХВАТА БЛИЖАЙШЕГО УЗЛА</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 3: Двойственность (Bottom-Left Glass Card + Formula) -->
+      <section class="slide items-end justify-start" data-slide="2" aria-label="Слайд 3 из 11">
+        <div class="slide-panel-width w-[47%] max-w-[700px] glass-panel rounded-[28px] p-9 md:p-10 flex flex-col gap-5 mb-4">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Математический фундамент</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[36px] font-bold leading-[1.15] tracking-[-0.02em] headline-gradient">
+            Как устроена диаграмма и её двойник
+          </h2>
+          <div class="anim-item font-mono-tech text-[15px] md:text-[17px] px-5 py-3.5 rounded-2xl bg-[#04020e]/65 border border-[#59e6ff]/30 text-[#f3f7ff] tracking-[0.02em] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+            V(Pᵢ) = { x ∈ ℝ² | d(x, Pᵢ) ≤ d(x, Pⱼ), ∀ j ≠ i }
+          </div>
+          <p class="anim-item slide-body text-[16px]">
+            Мы берём опорные точки и делим пространство так, чтобы каждая зона принадлежала ближайшему центру. Если соединить соседние центры отрезками, возникает триангуляция Делоне. Вместе они дают полный каркас для анализа расстояний.
+          </p>
+        </div>
+      </section>
+
+      <!-- SLIDE 4: Алгоритм Форчуна (Left Editorial Column, Open Air) -->
+      <section class="slide items-center justify-start" data-slide="3" aria-label="Слайд 4 из 11">
+        <div class="slide-panel-width w-[42%] max-w-[610px] pl-7 border-l-2 border-[#59e6ff]/55 flex flex-col gap-5 pointer-events-auto">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Вычислительная механика</span>
+          </div>
+          <h2 class="anim-item text-[34px] md:text-[40px] font-bold leading-[1.14] tracking-[-0.02em] headline-gradient">
+            Как я заставил это считаться за доли секунды
+          </h2>
+          <p class="anim-item slide-body text-[17px]">
+            Наивный перебор расстояний слишком медленный для реальных карт. Я изучил алгоритм заметающей прямой Стивена Форчуна: он строит карту ячеек за один проход со сложностью O(n log n), позволяя запускать расчёты прямо в браузере на обычном ноутбуке.
+          </p>
+          <div class="anim-item flex items-center gap-4 pt-1 font-mono-tech text-[12px] text-[#f3f7ff]/65">
+            <span class="px-3 py-1 rounded-md bg-white/5 border border-white/10">SWEEP LINE</span>
+            <span class="px-3 py-1 rounded-md bg-white/5 border border-white/10">BEACH FRONT</span>
+            <span class="px-3 py-1 rounded-md bg-[#59e6ff]/10 border border-[#59e6ff]/30 text-[#59e6ff]">1 PASS</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 5: Хаос (Top-Right Diagnostic Panel) -->
+      <section class="slide items-start justify-end" data-slide="4" aria-label="Слайд 5 из 11">
+        <div class="slide-panel-width w-[44%] max-w-[640px] glass-panel rounded-[28px] p-9 md:p-10 flex flex-col gap-5 mt-8" style="border-color: rgba(246, 202, 114, 0.28);">
+          <div class="kicker-pill anim-item" style="color: #f6ca72;">
+            <span class="kicker-dot" style="background: #f6ca72; box-shadow: 0 0 12px rgba(246,202,114,0.85);"></span>
+            <span>Диагностика проблемы</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[38px] font-bold leading-[1.15] tracking-[-0.02em] headline-gold">
+            Что происходит, когда объекты размещают вслепую
+          </h2>
+          <p class="anim-item slide-body text-[16.5px]">
+            Наложив сетку Вороного на планы районов и квартир, я увидел системную ошибку. При интуитивной расстановке одни ячейки перегружаются, а другие дублируют друг друга. В быту это даёт лишние километры пути, мёртвые зоны Wi-Fi и перерасход материалов.
+          </p>
+        </div>
+      </section>
+
+      <!-- SLIDE 6: Метод Ллойда (Bottom-Left Balanced Card) -->
+      <section class="slide items-end justify-start" data-slide="5" aria-label="Слайд 6 из 11">
+        <div class="slide-panel-width w-[45%] max-w-[660px] glass-panel rounded-[28px] p-9 md:p-10 flex flex-col gap-5 mb-4">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Инженерное решение</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[38px] font-bold leading-[1.15] tracking-[-0.02em] headline-gradient">
+            Метод Ллойда: как я научил систему находить баланс
+          </h2>
+          <p class="anim-item slide-body text-[16.5px]">
+            Чтобы убрать перекосы, я применил релаксацию Ллойда. Алгоритм находит центр масс каждой ячейки и сдвигает туда опорную точку, перестраивая границы. За несколько итераций хаотичная карта превращается в равномерную сеть со справедливой нагрузкой.
+          </p>
+        </div>
+      </section>
+
+      <!-- SLIDE 7: Мой прототип (Left CAD Briefing) -->
+      <section class="slide items-center justify-start" data-slide="6" aria-label="Слайд 7 из 11">
+        <div class="slide-panel-width w-[42%] max-w-[620px] glass-panel rounded-[28px] p-9 md:p-10 flex flex-col gap-5">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Переход к проекту</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[38px] font-bold leading-[1.15] tracking-[-0.02em] headline-gradient">
+            Мой прототип: пространственный оптимизатор
+          </h2>
+          <p class="anim-item slide-body text-[16.5px]">
+            Объединив эти алгоритмы, я собрал прототип веб-инструмента. Пользователь загружает план помещения или карту района, задаёт число точек — и система вычисляет оптимальные позиции с минимальным средним расстоянием до любой точки зоны.
+          </p>
+          <div class="anim-item grid grid-cols-3 gap-3 pt-1 font-mono-tech text-[11px] text-[#f3f7ff]/75">
+            <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+              <div class="text-[#59e6ff] text-[13px] font-semibold">INPUT</div>
+              <div class="mt-1 opacity-75">План / карта</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+              <div class="text-[#a06bff] text-[13px] font-semibold">SOLVER</div>
+              <div class="mt-1 opacity-75">Fortune + Lloyd</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+              <div class="text-[#f6ca72] text-[13px] font-semibold">OUTPUT</div>
+              <div class="mt-1 opacity-75">Узлы и зоны</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 8: Четыре задачи (4 Glass Cards over 3D Tilting Panels) -->
+      <section class="slide flex-col justify-between" data-slide="7" aria-label="Слайд 8 из 11">
+        <div class="flex flex-col gap-3 max-w-[780px] pt-6 pointer-events-auto">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Практическая польза</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[40px] font-bold leading-[1.12] tracking-[-0.02em] headline-gradient">
+            Четыре задачи, которые решает мой инструмент
+          </h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full my-auto py-4">
+          <article class="task-card anim-item rounded-[22px] p-6 flex flex-col gap-3">
+            <span class="font-mono-tech text-[12px] text-[#59e6ff] tracking-[0.14em]">01 // ДОМ</span>
+            <h3 class="text-[20px] font-bold text-[#f3f7ff]">Планирование дома</h3>
+            <p class="slide-body text-[14.5px]">
+              расчёт точек для роутеров, датчиков и света без слепых зон.
+            </p>
+          </article>
+
+          <article class="task-card anim-item rounded-[22px] p-6 flex flex-col gap-3">
+            <span class="font-mono-tech text-[12px] text-[#3d7bff] tracking-[0.14em]">02 // ЛОГИСТИКА</span>
+            <h3 class="text-[20px] font-bold text-[#f3f7ff]">Личная логистика</h3>
+            <p class="slide-body text-[14.5px]">
+              выбор оптимальной точки встречи с учётом маршрутов всех участников.
+            </p>
+          </article>
+
+          <article class="task-card anim-item rounded-[22px] p-6 flex flex-col gap-3">
+            <span class="font-mono-tech text-[12px] text-[#a06bff] tracking-[0.14em]">03 // БИЗНЕС</span>
+            <h3 class="text-[20px] font-bold text-[#f3f7ff]">Малый бизнес</h3>
+            <p class="slide-body text-[14.5px]">
+              поиск локации для новой точки там, где она закроет дефицит спроса.
+            </p>
+          </article>
+
+          <article class="task-card anim-item rounded-[22px] p-6 flex flex-col gap-3">
+            <span class="font-mono-tech text-[12px] text-[#f6ca72] tracking-[0.14em]">04 // РАСКРОЙ</span>
+            <h3 class="text-[20px] font-bold text-[#f3f7ff]">Экономия материалов</h3>
+            <p class="slide-body text-[14.5px]">
+              разметка и раскрой листов под детали с минимальным остатком.
+            </p>
+          </article>
+        </div>
+
+        <p class="anim-item slide-body text-[16px] text-[#f3f7ff]/85 max-w-[780px] pb-2 pointer-events-auto">
+          Я проверил алгоритм на каждом сценарии: одна модель закрывает десятки рутинных расчётов.
+        </p>
+      </section>
+
+      <!-- SLIDE 9: Бенчмарк (Right Metrics Panel) -->
+      <section class="slide items-center justify-end" data-slide="8" aria-label="Слайд 9 из 11">
+        <div class="slide-panel-width w-[45%] max-w-[650px] glass-panel rounded-[28px] p-9 md:p-11 flex flex-col gap-6">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Проверка на цифрах</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[38px] font-bold leading-[1.15] tracking-[-0.02em] headline-gradient">
+            Что показали замеры на реальных данных
+          </h2>
+          <div class="anim-item grid grid-cols-2 gap-4">
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+              <div class="font-mono-tech text-[28px] font-bold text-[#59e6ff]">−24–31%</div>
+              <div class="font-mono-tech text-[11px] uppercase tracking-[0.12em] text-white/60 mt-1">Δ DIST // ДИСТАНЦИЯ</div>
+            </div>
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+              <div class="font-mono-tech text-[28px] font-bold text-[#f6ca72]">&lt; 40 мс</div>
+              <div class="font-mono-tech text-[11px] uppercase tracking-[0.12em] text-white/60 mt-1">1 000 ОБЪЕКТОВ</div>
+            </div>
+          </div>
+          <p class="anim-item slide-body text-[16.5px]">
+            Я сравнил интуитивную расстановку с расчётом по методу Вороного. Оптимизация сокращает среднюю дистанцию до ближайшего узла на 24–31% и убирает локальные перегрузки, а расчёт для тысячи объектов занимает меньше 40 миллисекунд.
+          </p>
+        </div>
+      </section>
+
+      <!-- SLIDE 10: Масштабирование (Bottom-Right Editorial Panel) -->
+      <section class="slide items-end justify-end" data-slide="9" aria-label="Слайд 10 из 11">
+        <div class="slide-panel-width w-[45%] max-w-[650px] glass-panel rounded-[28px] p-9 md:p-10 flex flex-col gap-5 mb-4">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Вектор развития</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[38px] font-bold leading-[1.15] tracking-[-0.02em] headline-gradient">
+            От личного скрипта к открытому сервису
+          </h2>
+          <p class="anim-item slide-body text-[16.5px]">
+            Это исследование показало, как геометрия упорядочивает повседневный хаос. Сейчас я добавляю в свой инструмент учёт реальных стен и дорожных графов вместо прямых линий, чтобы превратить прототип в доступный веб-сервис для бытовых и инженерных задач.
+          </p>
+        </div>
+      </section>
+
+      <!-- SLIDE 11: База знаний (Left Editorial Credits) -->
+      <section class="slide items-center justify-start" data-slide="10" aria-label="Слайд 11 из 11">
+        <div class="slide-panel-width w-[45%] max-w-[650px] glass-panel rounded-[28px] p-9 md:p-11 flex flex-col gap-6">
+          <div class="kicker-pill anim-item">
+            <span class="kicker-dot"></span>
+            <span>Источники и база знаний</span>
+          </div>
+          <h2 class="anim-item text-[32px] md:text-[38px] font-bold leading-[1.15] tracking-[-0.02em] headline-gradient">
+            На чём основано моё исследование
+          </h2>
+          <p class="anim-item slide-body text-[16.5px]">
+            В основе работы лежат труды Георгия Вороного и Бориса Делоне, алгоритм Стивена Форчуна, метод квантования Стюарта Ллойда, учебник Франко Препараты по вычислительной геометрии и документация библиотеки CGAL.
+          </p>
+          <div class="anim-item flex flex-wrap gap-2 pt-1 font-mono-tech text-[11px] tracking-[0.14em]">
+            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-[#59e6ff]/30 text-[#59e6ff]">VORONOI</span>
+            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-[#3d7bff]/35 text-[#8cb4ff]">DELAUNAY</span>
+            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-[#a06bff]/35 text-[#c4a2ff]">FORTUNE</span>
+            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-[#f6ca72]/35 text-[#f6ca72]">LLOYD</span>
+            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/20 text-[#f3f7ff]/85">CGAL</span>
+            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/20 text-[#f3f7ff]/85">PREPARATA</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Navigation Controls -->
+      <nav class="desktop-hud-bottom absolute bottom-0 left-0 right-0 z-30 flex items-center justify-between px-[88px] pb-[34px] pointer-events-none" aria-label="Управление презентацией">
+        <div class="flex items-center gap-3">
+          <button
+            id="btn-prev"
+            type="button"
+            class="glass-lens w-12 h-12 rounded-full flex items-center justify-center text-[18px] text-[#f3f7ff]"
+            aria-label="Предыдущий слайд"
+          >
+            ←
+          </button>
+          <button
+            id="btn-next"
+            type="button"
+            class="glass-lens w-12 h-12 rounded-full flex items-center justify-center text-[18px] text-[#f3f7ff]"
+            aria-label="Следующий слайд"
+          >
+            →
+          </button>
+        </div>
+
+        <div id="nav-dots" class="flex items-center gap-2.5" role="tablist" aria-label="Выбор слайда"></div>
+
+        <div class="hidden md:flex items-center gap-2 font-mono-tech text-[11px] tracking-[0.14em] text-[#f3f7ff]/45 uppercase">
+          <span>← / →</span>
+          <span>•</span>
+          <span>SCROLL</span>
+        </div>
+      </nav>
+
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const TOTAL_SLIDES = 11;
+      let currentSlide = 0;
+      let isTransitioning = false;
+      let wheelLockUntil = 0;
+      let touchStartX = 0;
+      let touchStartY = 0;
+
+      const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      let prefersReducedMotion = reducedMotionQuery.matches;
+      if (reducedMotionQuery.addEventListener) {
+        reducedMotionQuery.addEventListener('change', (e) => {
+          prefersReducedMotion = e.matches;
+        });
+      }
+
+      const stageEl = document.getElementById('stage');
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const counterCurrentEl = document.getElementById('slide-counter-current');
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+      const navDotsContainer = document.getElementById('nav-dots');
+      const webglBadge = document.getElementById('webgl-badge');
+
+      // Build navigation dots
+      const navDots = [];
+      for (let i = 0; i < TOTAL_SLIDES; i++) {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+        dot.setAttribute('aria-label', 'Перейти к слайду ' + (i + 1));
+        dot.setAttribute('role', 'tab');
+        dot.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+        dot.addEventListener('click', () => goToSlide(i));
+        navDotsContainer.appendChild(dot);
+        navDots.push(dot);
+      }
+
+      // Responsive 1600x900 stage scaling
+      function updateStageScale() {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        if (vw < 768) {
+          stageEl.style.transform = 'none';
+        } else {
+          const scale = Math.min(vw / 1600, vh / 900);
+          stageEl.style.transform = 'scale(' + scale.toFixed(4) + ')';
+        }
+      }
+      updateStageScale();
+
+      // Pointer state normalized [-1, 1]
+      const pointer = { x: 0, y: 0, targetX: 0, targetY: 0 };
+      window.addEventListener('pointermove', (e) => {
+        pointer.targetX = (e.clientX / window.innerWidth) * 2 - 1;
+        pointer.targetY = -((e.clientY / window.innerHeight) * 2 - 1);
+      }, { passive: true });
+
+      // =========================================================================
+      // THREE.JS ARCHITECTURE + FALLBACK
+      // =========================================================================
+      const webglCanvas = document.getElementById('webgl-canvas');
+      const fallbackCanvas = document.getElementById('fallback-canvas');
+      let hasWebGL = false;
+      let renderer, scene, camera, bgUniforms;
+      const slideGroups = [];
+      let slideControllers = [];
+
+      function createTextSpriteTexture(text, opts) {
+        const options = Object.assign({
+          width: 512,
+          height: 160,
+          font: '600 44px "JetBrains Mono", monospace',
+          color: '#f3f7ff',
+          glow: 'rgba(89, 230, 255, 0.75)',
+          bg: null,
+          border: null
+        }, opts || {});
+
+        const canvas = document.createElement('canvas');
+        canvas.width = options.width;
+        canvas.height = options.height;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (options.bg) {
+          ctx.fillStyle = options.bg;
+          ctx.beginPath();
+          ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 18);
+          ctx.fill();
+        }
+        if (options.border) {
+          ctx.strokeStyle = options.border;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 18);
+          ctx.stroke();
+        }
+
+        ctx.font = options.font;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = options.glow;
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = options.color;
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      // Simple deterministic PRNG for reproducible geometry
+      function mulberry32(seed) {
+        return function () {
+          let t = seed += 0x6D2B79F5;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      // Compute 2D Voronoi cell polygons by clipping a bounding box against perpendicular bisectors
+      function computeVoronoiCells(sites, bounds) {
+        const cells = [];
+        for (let i = 0; i < sites.length; i++) {
+          let poly = [
+            { x: bounds.minX, y: bounds.minY },
+            { x: bounds.maxX, y: bounds.minY },
+            { x: bounds.maxX, y: bounds.maxY },
+            { x: bounds.minX, y: bounds.maxY }
+          ];
+          const si = sites[i];
+          for (let j = 0; j < sites.length; j++) {
+            if (i === j) continue;
+            const sj = sites[j];
+            const mx = (si.x + sj.x) * 0.5;
+            const my = (si.y + sj.y) * 0.5;
+            const nx = sj.x - si.x;
+            const ny = sj.y - si.y;
+            const nextPoly = [];
+            for (let k = 0; k < poly.length; k++) {
+              const a = poly[k];
+              const b = poly[(k + 1) % poly.length];
+              const da = (a.x - mx) * nx + (a.y - my) * ny;
+              const db = (b.x - mx) * nx + (b.y - my) * ny;
+              const aIn = da <= 0;
+              const bIn = db <= 0;
+              if (aIn && bIn) {
+                nextPoly.push(b);
+              } else if (aIn && !bIn) {
+                const t = da / (da - db);
+                nextPoly.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+              } else if (!aIn && bIn) {
+                const t = da / (da - db);
+                nextPoly.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+                nextPoly.push(b);
+              }
+            }
+            poly = nextPoly;
+            if (poly.length < 3) break;
+          }
+          cells.push(poly);
+        }
+        return cells;
+      }
+
+      function polyCentroid(poly) {
+        if (!poly || poly.length < 3) return { x: 0, y: 0 };
+        let area = 0, cx = 0, cy = 0;
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i];
+          const b = poly[(i + 1) % poly.length];
+          const cross = a.x * b.y - b.x * a.y;
+          area += cross;
+          cx += (a.x + b.x) * cross;
+          cy += (a.y + b.y) * cross;
+        }
+        area *= 0.5;
+        if (Math.abs(area) < 1e-6) return { x: poly[0].x, y: poly[0].y };
+        return { x: cx / (6 * area), y: cy / (6 * area) };
+      }
+
+      function initWebGL() {
+        if (typeof THREE === 'undefined') return false;
+        try {
+          renderer = new THREE.WebGLRenderer({
+            canvas: webglCanvas,
+            antialias: true,
+            alpha: false,
+            powerPreference: 'high-performance'
+          });
+        } catch (err) {
+          return false;
+        }
+        if (!renderer || !renderer.getContext()) return false;
+
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.autoClear = true;
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 150);
+        camera.position.set(0, 0, 14);
+
+        // 1. Fullscreen GLSL Background Shader
+        bgUniforms = {
+          uTime: { value: 0 },
+          uMouse: { value: new THREE.Vector2(0, 0) },
+          uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+        };
+
+        const bgMat = new THREE.ShaderMaterial({
+          uniforms: bgUniforms,
+          depthTest: false,
+          depthWrite: false,
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = vec4(position.xy, 0.9999, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform float uTime;
+            uniform vec2 uMouse;
+            uniform vec2 uResolution;
+            varying vec2 vUv;
+
+            float hash(vec2 p) {
+              return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+            }
+
+            float noise(vec2 p) {
+              vec2 i = floor(p);
+              vec2 f = fract(p);
+              vec2 u = f * f * (3.0 - 2.0 * f);
+              return mix(
+                mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+                mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+                u.y
+              );
+            }
+
+            float fbm(vec2 p) {
+              float v = 0.0;
+              float a = 0.5;
+              for (int i = 0; i < 4; i++) {
+                v += a * noise(p);
+                p *= 2.02;
+                a *= 0.5;
+              }
+              return v;
+            }
+
+            void main() {
+              vec2 aspect = vec2(uResolution.x / max(uResolution.y, 1.0), 1.0);
+              vec2 uv = (vUv - 0.5) * aspect;
+              vec2 m = uMouse * 0.35 * aspect;
+
+              float t = uTime * 0.08;
+              float n1 = fbm(uv * 1.4 + vec2(t, -t * 0.7) + m * 0.4);
+              float n2 = fbm(uv * 2.3 - vec2(t * 0.6, t) - m * 0.25);
+
+              vec3 cVoid = vec3(0.0157, 0.0078, 0.0549);   // #04020e
+              vec3 cDeep = vec3(0.0275, 0.0235, 0.0667);   // #070611
+              vec3 cIndigo = vec3(0.0392, 0.0627, 0.1882); // #0a1030
+              vec3 cPlum = vec3(0.0863, 0.0510, 0.1922);   // #160d31
+
+              vec3 col = mix(cVoid, cDeep, smoothstep(-0.6, 0.6, uv.y + 0.15 * n1));
+              col = mix(col, cIndigo, smoothstep(0.25, 0.85, n1) * 0.85);
+              col = mix(col, cPlum, smoothstep(0.35, 0.9, n2) * 0.65);
+
+              float cursorGlow = exp(-length(uv - m * 1.4) * 2.4);
+              col += vec3(0.04, 0.12, 0.22) * cursorGlow * 0.55;
+
+              float grain = (hash(vUv * uResolution + fract(uTime) * 100.0) - 0.5) * 0.022;
+              col += grain;
+
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `
+        });
+
+        const bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgMat);
+        bgMesh.renderOrder = -1000;
+        bgMesh.frustumCulled = false;
+        scene.add(bgMesh);
+
+        // Ambient & subtle directional lighting
+        const ambientLight = new THREE.AmbientLight(0xdce8ff, 0.65);
+        scene.add(ambientLight);
+        const dirLight1 = new THREE.DirectionalLight(0x59e6ff, 1.1);
+        dirLight1.position.set(6, 8, 10);
+        scene.add(dirLight1);
+        const dirLight2 = new THREE.DirectionalLight(0xa06bff, 0.75);
+        dirLight2.position.set(-7, -4, 6);
+        scene.add(dirLight2);
+
+        // Build all 11 slide groups
+        slideControllers = [
+          buildSlide1(),
+          buildSlide2(),
+          buildSlide3(),
+          buildSlide4(),
+          buildSlide5(),
+          buildSlide6(),
+          buildSlide7(),
+          buildSlide8(),
+          buildSlide9(),
+          buildSlide10(),
+          buildSlide11()
+        ];
+
+        slideGroups.forEach((g, idx) => {
+          g.visible = idx === 0;
+          scene.add(g);
+        });
+
+        return true;
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 1: 15,000 particles in 3D Voronoi cells + volumetric O(n log n)
+      // -----------------------------------------------------------------------
+      function buildSlide1() {
+        const group = new THREE.Group();
+        group.position.set(2.4, 0, 0);
+
+        const rand = mulberry32(101);
+        const numSeeds = 18;
+        const seeds = [];
+        for (let i = 0; i < numSeeds; i++) {
+          seeds.push(new THREE.Vector3(
+            (rand() - 0.5) * 7.5,
+            (rand() - 0.5) * 5.2,
+            (rand() - 0.5) * 4.0
+          ));
+        }
+
+        const count = 15000;
+        const positions = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        const sizes = new Float32Array(count);
+
+        const palette = [
+          new THREE.Color('#59e6ff'),
+          new THREE.Color('#3d7bff'),
+          new THREE.Color('#a06bff'),
+          new THREE.Color('#f3f7ff')
+        ];
+
+        for (let i = 0; i < count; i++) {
+          const px = (rand() - 0.5) * 8.4;
+          const py = (rand() - 0.5) * 5.8;
+          const pz = (rand() - 0.5) * 4.4;
+
+          let minD = 1e9, secondD = 1e9, bestIdx = 0;
+          for (let s = 0; s < numSeeds; s++) {
+            const dx = px - seeds[s].x;
+            const dy = py - seeds[s].y;
+            const dz = pz - seeds[s].z;
+            const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (d < minD) {
+              secondD = minD;
+              minD = d;
+              bestIdx = s;
+            } else if (d < secondD) {
+              secondD = d;
+            }
+          }
+
+          positions[i * 3] = px;
+          positions[i * 3 + 1] = py;
+          positions[i * 3 + 2] = pz;
+
+          const edgeFactor = Math.exp(-Math.abs(secondD - minD) * 4.5);
+          const col = palette[bestIdx % palette.length].clone();
+          col.lerp(new THREE.Color('#59e6ff'), edgeFactor * 0.7);
+          colors[i * 3] = col.r;
+          colors[i * 3 + 1] = col.g;
+          colors[i * 3 + 2] = col.b;
+
+          sizes[i] = 1.6 + edgeFactor * 3.2;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+        geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+        const uniforms = {
+          uTime: { value: 0 },
+          uMouse: { value: new THREE.Vector2(0, 0) },
+          uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) }
+        };
+
+        const mat = new THREE.ShaderMaterial({
+          uniforms: uniforms,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          vertexShader: `
+            attribute vec3 aColor;
+            attribute float aSize;
+            uniform float uTime;
+            uniform vec2 uMouse;
+            uniform float uPixelRatio;
+            varying vec3 vColor;
+            varying float vAlpha;
+            void main() {
+              vColor = aColor;
+              vec3 pos = position;
+              vec2 mWorld = uMouse * vec2(5.0, 3.2);
+              float dist = length(pos.xy - mWorld);
+              float push = exp(-dist * 0.75) * 0.65;
+              pos.xy += normalize(pos.xy - mWorld + vec2(0.0001)) * push;
+              pos.z += sin(uTime * 0.8 + pos.x * 0.7 + pos.y * 0.5) * 0.14 + push * 0.4;
+              vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
+              gl_PointSize = aSize * uPixelRatio * (10.0 / -mvPos.z);
+              vAlpha = 0.45 + 0.45 * push;
+              gl_Position = projectionMatrix * mvPos;
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            varying float vAlpha;
+            void main() {
+              float d = length(gl_PointCoord - vec2(0.5));
+              if (d > 0.5) discard;
+              float alpha = smoothstep(0.5, 0.08, d) * vAlpha;
+              gl_FragColor = vec4(vColor, alpha);
+            }
+          `
+        });
+
+        const points = new THREE.Points(geo, mat);
+        group.add(points);
+
+        // Volumetric O(n log n) layered planes
+        const textTex = createTextSpriteTexture('O(n log n)', {
+          width: 768,
+          height: 220,
+          font: '800 96px "JetBrains Mono", monospace',
+          color: '#f3f7ff',
+          glow: 'rgba(89, 230, 255, 0.95)'
+        });
+        const textGroup = new THREE.Group();
+        for (let layer = 0; layer < 5; layer++) {
+          const planeMat = new THREE.MeshBasicMaterial({
+            map: textTex,
+            transparent: true,
+            opacity: layer === 4 ? 0.95 : 0.14,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          });
+          const plane = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.32), planeMat);
+          plane.position.z = (layer - 2) * 0.08;
+          textGroup.add(plane);
+        }
+        group.add(textGroup);
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          uniforms.uTime.value = t;
+          uniforms.uMouse.value.set(mx, my);
+          points.rotation.y = Math.sin(t * 0.15) * 0.18 + mx * 0.16;
+          points.rotation.x = Math.cos(t * 0.12) * 0.08 - my * 0.12;
+          textGroup.rotation.y = mx * 0.25;
+          textGroup.rotation.x = -my * 0.18;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 2: Nearest Neighbor Probe + Ray
+      // -----------------------------------------------------------------------
+      function buildSlide2() {
+        const group = new THREE.Group();
+        group.position.set(-2.3, 0, 0);
+
+        const rand = mulberry32(202);
+        const nodes = [];
+        const nodeMeshes = [];
+        const nodeGeo = new THREE.SphereGeometry(0.085, 16, 16);
+
+        for (let i = 0; i < 28; i++) {
+          const pos = new THREE.Vector3(
+            (rand() - 0.5) * 6.5,
+            (rand() - 0.5) * 5.0,
+            (rand() - 0.5) * 2.2
+          );
+          nodes.push(pos);
+          const mat = new THREE.MeshBasicMaterial({ color: 0x3d7bff });
+          const m = new THREE.Mesh(nodeGeo, mat);
+          m.position.copy(pos);
+          group.add(m);
+          nodeMeshes.push(m);
+        }
+
+        // Probe sphere + ring
+        const probe = new THREE.Mesh(
+          new THREE.SphereGeometry(0.13, 20, 20),
+          new THREE.MeshBasicMaterial({ color: 0x59e6ff })
+        );
+        group.add(probe);
+
+        const targetRing = new THREE.Mesh(
+          new THREE.RingGeometry(0.18, 0.24, 32),
+          new THREE.MeshBasicMaterial({ color: 0xf6ca72, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+        );
+        group.add(targetRing);
+
+        // Dynamic ray line
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.9 });
+        const rayLine = new THREE.Line(lineGeo, lineMat);
+        group.add(rayLine);
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          const px = mx * 3.4;
+          const py = my * 2.6;
+          probe.position.set(px, py, 0.4);
+
+          let bestIdx = 0;
+          let bestDist = 1e9;
+          for (let i = 0; i < nodes.length; i++) {
+            const d = nodes[i].distanceTo(probe.position);
+            if (d < bestDist) {
+              bestDist = d;
+              bestIdx = i;
+            }
+            nodeMeshes[i].material.color.setHex(i === bestIdx ? 0xf6ca72 : 0x3d7bff);
+            nodeMeshes[i].scale.setScalar(1.0);
+          }
+          nodeMeshes[bestIdx].material.color.setHex(0xf6ca72);
+          nodeMeshes[bestIdx].scale.setScalar(1.65 + Math.sin(t * 5) * 0.2);
+
+          targetRing.position.copy(nodes[bestIdx]);
+          targetRing.lookAt(camera.position);
+
+          const posAttr = rayLine.geometry.attributes.position;
+          posAttr.setXYZ(0, probe.position.x, probe.position.y, probe.position.z);
+          posAttr.setXYZ(1, nodes[bestIdx].x, nodes[bestIdx].y, nodes[bestIdx].z);
+          posAttr.needsUpdate = true;
+
+          group.rotation.y = mx * 0.08;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 3: Voronoi + Delaunay Duality
+      // -----------------------------------------------------------------------
+      function buildSlide3() {
+        const group = new THREE.Group();
+        group.position.set(2.2, 0.65, 0);
+        group.rotation.set(-0.35, -0.2, 0.05);
+
+        const rand = mulberry32(303);
+        const sites = [];
+        for (let i = 0; i < 16; i++) {
+          sites.push({ x: (rand() - 0.5) * 6.4, y: (rand() - 0.5) * 4.4 });
+        }
+
+        const cells = computeVoronoiCells(sites, { minX: -3.6, maxX: 3.6, minY: -2.6, maxY: 2.6 });
+
+        // Translucent Voronoi cells
+        cells.forEach((poly, idx) => {
+          if (poly.length < 3) return;
+          const shape = new THREE.Shape();
+          shape.moveTo(poly[0].x, poly[0].y);
+          for (let k = 1; k < poly.length; k++) shape.lineTo(poly[k].x, poly[k].y);
+          shape.closePath();
+
+          const mesh = new THREE.Mesh(
+            new THREE.ShapeGeometry(shape),
+            new THREE.MeshBasicMaterial({
+              color: idx % 2 === 0 ? 0x3d7bff : 0x160d31,
+              transparent: true,
+              opacity: 0.22,
+              side: THREE.DoubleSide
+            })
+          );
+          group.add(mesh);
+
+          const pts = poly.map(p => new THREE.Vector3(p.x, p.y, 0.02));
+          pts.push(pts[0].clone());
+          const edgeLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(pts),
+            new THREE.LineBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.65 })
+          );
+          group.add(edgeLine);
+        });
+
+        // Delaunay dual edges (connect pairs sharing Voronoi edge)
+        const delaunayPts = [];
+        for (let i = 0; i < sites.length; i++) {
+          for (let j = i + 1; j < sites.length; j++) {
+            const dx = sites[i].x - sites[j].x;
+            const dy = sites[i].y - sites[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 2.45) {
+              delaunayPts.push(new THREE.Vector3(sites[i].x, sites[i].y, 0.55));
+              delaunayPts.push(new THREE.Vector3(sites[j].x, sites[j].y, 0.55));
+            }
+          }
+        }
+        const delaunayGeo = new THREE.BufferGeometry().setFromPoints(delaunayPts);
+        const delaunayLines = new THREE.LineSegments(
+          delaunayGeo,
+          new THREE.LineBasicMaterial({ color: 0xa06bff, transparent: true, opacity: 0.9 })
+        );
+        group.add(delaunayLines);
+
+        // Seed nodes
+        const seedGeo = new THREE.SphereGeometry(0.075, 12, 12);
+        const seedMat = new THREE.MeshBasicMaterial({ color: 0xf6ca72 });
+        sites.forEach((s) => {
+          const m = new THREE.Mesh(seedGeo, seedMat);
+          m.position.set(s.x, s.y, 0.55);
+          group.add(m);
+        });
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          group.rotation.y = -0.2 + Math.sin(t * 0.3) * 0.1 + mx * 0.14;
+          group.rotation.x = -0.35 + my * 0.1;
+          delaunayLines.position.z = Math.sin(t * 0.9) * 0.12;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 4: Fortune's Sweep Line
+      // -----------------------------------------------------------------------
+      function buildSlide4() {
+        const group = new THREE.Group();
+        group.position.set(2.3, 0, 0);
+
+        const rand = mulberry32(404);
+        const sites = [];
+        for (let i = 0; i < 18; i++) {
+          sites.push({ x: (rand() - 0.5) * 6.8, y: (rand() - 0.5) * 4.6 });
+        }
+        const cells = computeVoronoiCells(sites, { minX: -3.6, maxX: 3.6, minY: -2.6, maxY: 2.6 });
+
+        const edgeSegments = [];
+        cells.forEach((poly) => {
+          for (let k = 0; k < poly.length; k++) {
+            const a = poly[k];
+            const b = poly[(k + 1) % poly.length];
+            const line = new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(a.x, a.y, 0),
+                new THREE.Vector3(b.x, b.y, 0)
+              ]),
+              new THREE.LineBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.0 })
+            );
+            line.userData.midX = (a.x + b.x) * 0.5;
+            group.add(line);
+            edgeSegments.push(line);
+          }
+        });
+
+        // Seed nodes
+        const seedGeo = new THREE.SphereGeometry(0.065, 12, 12);
+        sites.forEach((s) => {
+          const m = new THREE.Mesh(seedGeo, new THREE.MeshBasicMaterial({ color: 0xf3f7ff }));
+          m.position.set(s.x, s.y, 0.05);
+          group.add(m);
+        });
+
+        // Luminous sweep line
+        const sweepLine = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.06, 5.4),
+          new THREE.MeshBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.95 })
+        );
+        sweepLine.position.z = 0.08;
+        group.add(sweepLine);
+
+        const sweepGlow = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.75, 5.4),
+          new THREE.MeshBasicMaterial({
+            color: 0x3d7bff,
+            transparent: true,
+            opacity: 0.16,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        sweepGlow.position.z = 0.06;
+        group.add(sweepGlow);
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          const cycle = ((t * 0.55) % 1.0);
+          const sweepX = -3.8 + cycle * 7.6;
+          sweepLine.position.x = sweepX;
+          sweepGlow.position.x = sweepX - 0.35;
+
+          edgeSegments.forEach((seg) => {
+            const diff = sweepX - seg.userData.midX;
+            if (diff > 0) {
+              seg.material.opacity = Math.min(0.85, diff * 0.85);
+            } else {
+              seg.material.opacity = 0.04;
+            }
+          });
+          group.rotation.y = mx * 0.12 - 0.15;
+          group.rotation.x = -my * 0.08;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 5: Chaos / Imbalanced District Map (Coral-Gold Overloaded vs Empty)
+      // -----------------------------------------------------------------------
+      function buildSlide5() {
+        const group = new THREE.Group();
+        group.position.set(-2.2, -0.2, 0);
+        group.rotation.set(-0.55, 0.25, 0);
+
+        const rand = mulberry32(505);
+        const sites = [];
+        // Cluster half in one corner (overload) and leave sparse elsewhere
+        for (let i = 0; i < 14; i++) {
+          sites.push({ x: -1.6 + (rand() - 0.5) * 1.8, y: 0.5 + (rand() - 0.5) * 1.8 });
+        }
+        for (let i = 0; i < 5; i++) {
+          sites.push({ x: 1.5 + (rand() - 0.5) * 2.4, y: -0.6 + (rand() - 0.5) * 2.6 });
+        }
+
+        const cells = computeVoronoiCells(sites, { minX: -3.5, maxX: 3.5, minY: -2.5, maxY: 2.5 });
+        const cellMeshes = [];
+
+        cells.forEach((poly, idx) => {
+          if (poly.length < 3) return;
+          const shape = new THREE.Shape();
+          shape.moveTo(poly[0].x, poly[0].y);
+          for (let k = 1; k < poly.length; k++) shape.lineTo(poly[k].x, poly[k].y);
+          shape.closePath();
+
+          const isOverloaded = idx < 14;
+          const depth = isOverloaded ? 0.55 + (idx % 3) * 0.25 : 0.08;
+          const color = isOverloaded ? (idx % 2 === 0 ? 0xf6ca72 : 0xff7b6b) : 0x160d31;
+
+          const extrudeGeo = new THREE.ExtrudeGeometry(shape, { depth: depth, bevelEnabled: false });
+          const mesh = new THREE.Mesh(
+            extrudeGeo,
+            new THREE.MeshBasicMaterial({
+              color: color,
+              transparent: true,
+              opacity: isOverloaded ? 0.52 : 0.28,
+              wireframe: false
+            })
+          );
+          const edges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(extrudeGeo),
+            new THREE.LineBasicMaterial({
+              color: isOverloaded ? 0xf6ca72 : 0x3d7bff,
+              transparent: true,
+              opacity: isOverloaded ? 0.85 : 0.3
+            })
+          );
+          mesh.add(edges);
+          mesh.userData.basePos = new THREE.Vector3(0, 0, 0);
+          mesh.userData.centroid = polyCentroid(poly);
+          group.add(mesh);
+          cellMeshes.push(mesh);
+        });
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          cellMeshes.forEach((m, i) => {
+            const c = m.userData.centroid;
+            const dx = c.x - mx * 2.5;
+            const dy = c.y - my * 2.0;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const drift = Math.exp(-dist * 0.8) * 0.35;
+            m.position.x = (dx / (dist + 0.1)) * drift;
+            m.position.y = (dy / (dist + 0.1)) * drift;
+            m.position.z = Math.sin(t * 1.4 + i) * 0.04;
+          });
+          group.rotation.z = Math.sin(t * 0.25) * 0.06;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 6: Lloyd Relaxation (Chaotic -> Balanced Honeycomb)
+      // -----------------------------------------------------------------------
+      function buildSlide6() {
+        const group = new THREE.Group();
+        group.position.set(2.3, 0.2, 0);
+
+        const rand = mulberry32(606);
+        const numSites = 20;
+        const startSites = [];
+        for (let i = 0; i < numSites; i++) {
+          startSites.push({ x: (rand() - 0.5) * 5.6, y: (rand() - 0.5) * 4.2 });
+        }
+
+        // Precompute 8 Lloyd iterations
+        const bounds = { minX: -3.4, maxX: 3.4, minY: -2.4, maxY: 2.4 };
+        const iterations = [startSites];
+        for (let it = 0; it < 8; it++) {
+          const prev = iterations[it];
+          const cells = computeVoronoiCells(prev, bounds);
+          const next = cells.map((poly, i) => {
+            const c = polyCentroid(poly);
+            return { x: prev[i].x * 0.2 + c.x * 0.8, y: prev[i].y * 0.2 + c.y * 0.8 };
+          });
+          iterations.push(next);
+        }
+
+        // Render relaxed honeycomb edges + animated nodes interpolating between iter 0 and iter 8
+        const balancedCells = computeVoronoiCells(iterations[8], bounds);
+        balancedCells.forEach((poly) => {
+          if (poly.length < 3) return;
+          const pts = poly.map(p => new THREE.Vector3(p.x, p.y, 0));
+          pts.push(pts[0].clone());
+          group.add(new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(pts),
+            new THREE.LineBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.55 })
+          ));
+        });
+
+        const nodeGeo = new THREE.SphereGeometry(0.085, 14, 14);
+        const nodeMeshes = [];
+        for (let i = 0; i < numSites; i++) {
+          const m = new THREE.Mesh(
+            nodeGeo,
+            new THREE.MeshBasicMaterial({ color: 0x59e6ff })
+          );
+          group.add(m);
+          nodeMeshes.push(m);
+        }
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          const phase = (Math.sin(t * 0.85) * 0.5 + 0.5); // smooth 0..1
+          for (let i = 0; i < numSites; i++) {
+            const a = iterations[0][i];
+            const b = iterations[8][i];
+            nodeMeshes[i].position.set(
+              a.x + (b.x - a.x) * phase,
+              a.y + (b.y - a.y) * phase,
+              0.08
+            );
+          }
+          group.rotation.y = mx * 0.14 - 0.15;
+          group.rotation.x = -my * 0.1 - 0.2;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 7: Holographic CAD Prototype
+      // -----------------------------------------------------------------------
+      function buildSlide7() {
+        const group = new THREE.Group();
+        group.position.set(2.3, -0.25, 0);
+        group.rotation.set(-0.62, -0.35, 0.1);
+
+        // Blueprint grid
+        const grid = new THREE.GridHelper(7, 14, 0x3d7bff, 0x160d31);
+        grid.rotation.x = Math.PI / 2;
+        group.add(grid);
+
+        // Translucent CAD blocks
+        const rand = mulberry32(707);
+        for (let i = 0; i < 16; i++) {
+          const w = 0.4 + rand() * 0.6;
+          const h = 0.4 + rand() * 0.6;
+          const d = 0.25 + rand() * 0.9;
+          const boxGeo = new THREE.BoxGeometry(w, h, d);
+          const box = new THREE.Mesh(
+            boxGeo,
+            new THREE.MeshBasicMaterial({ color: 0x0a1030, transparent: true, opacity: 0.65 })
+          );
+          box.position.set((rand() - 0.5) * 5.2, (rand() - 0.5) * 4.2, d * 0.5);
+          box.add(new THREE.LineSegments(
+            new THREE.EdgesGeometry(boxGeo),
+            new THREE.LineBasicMaterial({ color: 0x3d7bff, transparent: true, opacity: 0.55 })
+          ));
+          group.add(box);
+        }
+
+        // Coverage rings & optimal hubs
+        const hubs = [
+          new THREE.Vector3(-1.4, 0.9, 0.1),
+          new THREE.Vector3(1.5, 0.8, 0.1),
+          new THREE.Vector3(0.1, -1.3, 0.1)
+        ];
+        const rings = [];
+        hubs.forEach((h) => {
+          const hubMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.12, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0x59e6ff })
+          );
+          hubMesh.position.copy(h);
+          group.add(hubMesh);
+
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(1.35, 1.4, 48),
+            new THREE.MeshBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
+          );
+          ring.position.copy(h);
+          group.add(ring);
+          rings.push(ring);
+        });
+
+        // Routing paths
+        const routePts = [hubs[0], hubs[1], hubs[2], hubs[0]];
+        group.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(routePts),
+          new THREE.LineBasicMaterial({ color: 0xf6ca72, transparent: true, opacity: 0.85 })
+        ));
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          rings.forEach((r, idx) => {
+            const s = 0.92 + Math.sin(t * 2.0 + idx) * 0.08;
+            r.scale.set(s, s, 1);
+          });
+          group.rotation.z = 0.1 + Math.sin(t * 0.25) * 0.05 + mx * 0.1;
+          group.rotation.x = -0.62 - my * 0.08;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 8: 4 Glass 3D Panels with independent mouse tilt
+      // -----------------------------------------------------------------------
+      function buildSlide8() {
+        const group = new THREE.Group();
+        const panels = [];
+        const xs = [-3.9, -1.3, 1.3, 3.9];
+        const panelColors = [0x59e6ff, 0x3d7bff, 0xa06bff, 0xf6ca72];
+
+        xs.forEach((x, idx) => {
+          const pGroup = new THREE.Group();
+          pGroup.position.set(x, -0.1, -0.5);
+
+          const planeGeo = new THREE.PlaneGeometry(2.2, 3.2);
+          const planeMat = new THREE.MeshBasicMaterial({
+            color: 0x0a1030,
+            transparent: true,
+            opacity: 0.38,
+            side: THREE.DoubleSide
+          });
+          const mesh = new THREE.Mesh(planeGeo, planeMat);
+          const edge = new THREE.LineSegments(
+            new THREE.EdgesGeometry(planeGeo),
+            new THREE.LineBasicMaterial({ color: panelColors[idx], transparent: true, opacity: 0.65 })
+          );
+          pGroup.add(mesh);
+          pGroup.add(edge);
+          group.add(pGroup);
+          panels.push(pGroup);
+        });
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          panels.forEach((p, idx) => {
+            const offset = idx * 0.7;
+            p.rotation.y = mx * 0.28 + Math.sin(t * 0.8 + offset) * 0.06;
+            p.rotation.x = -my * 0.22 + Math.cos(t * 0.7 + offset) * 0.05;
+          });
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 9: 3D Benchmark Graph + Laser Scanner
+      // -----------------------------------------------------------------------
+      function buildSlide9() {
+        const group = new THREE.Group();
+        group.position.set(-2.3, -0.4, 0);
+        group.rotation.set(0.22, 0.35, 0);
+
+        const bars = [];
+        const barData = [
+          { x: -1.8, h1: 2.8, h2: 1.9 },
+          { x: -0.6, h1: 3.1, h2: 2.1 },
+          { x: 0.6, h1: 2.6, h2: 1.8 },
+          { x: 1.8, h1: 3.3, h2: 2.2 }
+        ];
+
+        barData.forEach((d) => {
+          // Intuitive (gold/coral)
+          const b1 = new THREE.Mesh(
+            new THREE.BoxGeometry(0.42, d.h1, 0.42),
+            new THREE.MeshBasicMaterial({ color: 0xf6ca72, transparent: true, opacity: 0.48 })
+          );
+          b1.position.set(d.x - 0.26, d.h1 * 0.5 - 1.2, 0.3);
+          group.add(b1);
+
+          // Voronoi (cyan)
+          const b2 = new THREE.Mesh(
+            new THREE.BoxGeometry(0.42, d.h2, 0.42),
+            new THREE.MeshBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.75 })
+          );
+          b2.position.set(d.x + 0.26, d.h2 * 0.5 - 1.2, -0.3);
+          group.add(b2);
+          bars.push(b2);
+        });
+
+        // Laser scanner plane
+        const scanner = new THREE.Mesh(
+          new THREE.PlaneGeometry(5.2, 0.04),
+          new THREE.MeshBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+        );
+        scanner.rotation.x = Math.PI / 2;
+        group.add(scanner);
+
+        // Floating CanvasTexture labels
+        const labels = [
+          { text: 'Δ DIST', pos: [-1.8, 2.3, 0.3] },
+          { text: 'COVERAGE', pos: [-0.4, 2.6, -0.2] },
+          { text: 'O(n log n)', pos: [1.0, 2.2, 0.2] },
+          { text: 'LLOYD ITER', pos: [2.0, 2.7, -0.3] }
+        ];
+        labels.forEach((lbl) => {
+          const tex = createTextSpriteTexture(lbl.text, {
+            width: 320,
+            height: 96,
+            font: '600 32px "JetBrains Mono", monospace',
+            color: '#59e6ff',
+            bg: 'rgba(4,2,14,0.72)',
+            border: 'rgba(89,230,255,0.45)'
+          });
+          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+          sprite.scale.set(1.5, 0.45, 1);
+          sprite.position.set(lbl.pos[0], lbl.pos[1], lbl.pos[2]);
+          group.add(sprite);
+        });
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          scanner.position.y = -0.8 + (Math.sin(t * 1.4) * 0.5 + 0.5) * 3.0;
+          group.rotation.y = 0.35 + mx * 0.16;
+          group.rotation.x = 0.22 - my * 0.1;
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 10: Dark Architectural Monolith Core + Geometric Waves
+      // -----------------------------------------------------------------------
+      function buildSlide10() {
+        const group = new THREE.Group();
+        group.position.set(-2.2, 0.2, 0);
+
+        const coreGeo = new THREE.OctahedronGeometry(1.15, 0);
+        const core = new THREE.Mesh(
+          coreGeo,
+          new THREE.MeshStandardMaterial({
+            color: 0x0a1030,
+            metalness: 0.85,
+            roughness: 0.18
+          })
+        );
+        core.add(new THREE.LineSegments(
+          new THREE.EdgesGeometry(coreGeo),
+          new THREE.LineBasicMaterial({ color: 0x59e6ff, transparent: true, opacity: 0.75 })
+        ));
+        group.add(core);
+
+        const waves = [];
+        for (let i = 0; i < 4; i++) {
+          const wave = new THREE.Mesh(
+            new THREE.RingGeometry(1.4, 1.44, 6),
+            new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x59e6ff : 0xa06bff, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+          );
+          wave.rotation.x = Math.PI / 2.4;
+          wave.userData.phase = i * 0.25;
+          group.add(wave);
+          waves.push(wave);
+        }
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          core.rotation.y = t * 0.35 + mx * 0.25;
+          core.rotation.x = t * 0.18 - my * 0.15;
+          waves.forEach((w) => {
+            const p = ((t * 0.28 + w.userData.phase) % 1.0);
+            const s = 0.9 + p * 2.4;
+            w.scale.set(s, s, 1);
+            w.material.opacity = (1.0 - p) * 0.65;
+          });
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // SLIDE 11: Knowledge Base Cluster
+      // -----------------------------------------------------------------------
+      function buildSlide11() {
+        const group = new THREE.Group();
+        group.position.set(2.3, 0, 0);
+
+        const items = [
+          { label: 'VORONOI', pos: [0, 0.9, 0.4], color: '#59e6ff' },
+          { label: 'DELAUNAY', pos: [-1.8, 0.2, -0.3], color: '#3d7bff' },
+          { label: 'FORTUNE', pos: [1.7, 0.3, -0.2], color: '#a06bff' },
+          { label: 'LLOYD', pos: [-1.1, -1.2, 0.5], color: '#f6ca72' },
+          { label: 'CGAL', pos: [1.4, -1.1, 0.3], color: '#f3f7ff' },
+          { label: 'PREPARATA', pos: [0.1, -0.2, -0.9], color: '#59e6ff' }
+        ];
+
+        const linePts = [];
+        for (let i = 0; i < items.length; i++) {
+          for (let j = i + 1; j < items.length; j++) {
+            linePts.push(new THREE.Vector3(...items[i].pos));
+            linePts.push(new THREE.Vector3(...items[j].pos));
+          }
+        }
+        group.add(new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(linePts),
+          new THREE.LineBasicMaterial({ color: 0x3d7bff, transparent: true, opacity: 0.35 })
+        ));
+
+        items.forEach((item) => {
+          const node = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(0.14, 0),
+            new THREE.MeshBasicMaterial({ color: item.color })
+          );
+          node.position.set(...item.pos);
+          group.add(node);
+
+          const tex = createTextSpriteTexture(item.label, {
+            width: 300,
+            height: 88,
+            font: '600 30px "JetBrains Mono", monospace',
+            color: item.color,
+            bg: 'rgba(4,2,14,0.72)',
+            border: 'rgba(255,255,255,0.2)'
+          });
+          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+          sprite.scale.set(1.45, 0.42, 1);
+          sprite.position.set(item.pos[0], item.pos[1] + 0.36, item.pos[2]);
+          group.add(sprite);
+        });
+
+        slideGroups.push(group);
+        return function update(t, mx, my) {
+          group.rotation.y = Math.sin(t * 0.2) * 0.2 + mx * 0.2;
+          group.rotation.x = Math.cos(t * 0.16) * 0.1 - my * 0.14;
+        };
+      }
+
+      hasWebGL = initWebGL();
+      if (!hasWebGL) {
+        webglCanvas.style.display = 'none';
+        fallbackCanvas.style.display = 'block';
+        if (webglBadge) webglBadge.textContent = '2D FALLBACK';
+      }
+
+      // Animation loop
+      const clock = new THREE.Clock ? new THREE.Clock() : null;
+      let elapsed = 0;
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = clock ? clock.getDelta() : 0.016;
+        elapsed += prefersReducedMotion ? dt * 0.2 : dt;
+
+        pointer.x += (pointer.targetX - pointer.x) * 0.08;
+        pointer.y += (pointer.targetY - pointer.y) * 0.08;
+
+        if (hasWebGL) {
+          bgUniforms.uTime.value = elapsed;
+          bgUniforms.uMouse.value.set(pointer.x, pointer.y);
+
+          for (let i = 0; i < slideGroups.length; i++) {
+            if (slideGroups[i].visible && slideControllers[i]) {
+              slideControllers[i](elapsed, pointer.x, pointer.y);
+            }
+          }
+          renderer.render(scene, camera);
+        }
+      }
+      animate();
+
+      // Resize handler
+      window.addEventListener('resize', () => {
+        updateStageScale();
+        if (hasWebGL) {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          bgUniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+        }
+      });
+
+      // =========================================================================
+      // SLIDE TRANSITIONS (GSAP ~0.8s)
+      // =========================================================================
+      function updateNavUI() {
+        counterCurrentEl.textContent = String(currentSlide + 1).padStart(2, '0');
+        btnPrev.disabled = currentSlide === 0;
+        btnNext.disabled = currentSlide === TOTAL_SLIDES - 1;
+        navDots.forEach((dot, idx) => {
+          const active = idx === currentSlide;
+          dot.classList.toggle('active', active);
+          dot.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+      }
+      updateNavUI();
+
+      const hasGSAP = typeof gsap !== 'undefined';
+      if (hasGSAP) {
+        gsap.set(slides[0], { opacity: 1 });
+      }
+
+      function goToSlide(nextIndex) {
+        if (nextIndex < 0 || nextIndex >= TOTAL_SLIDES || nextIndex === currentSlide || isTransitioning) {
+          return;
+        }
+
+        const prevIndex = currentSlide;
+        const direction = nextIndex > prevIndex ? 1 : -1;
+        currentSlide = nextIndex;
+        isTransitioning = true;
+        updateNavUI();
+
+        const outSlide = slides[prevIndex];
+        const inSlide = slides[nextIndex];
+        const dur = prefersReducedMotion ? 0.15 : 0.8;
+
+        if (hasGSAP) {
+          inSlide.classList.add('is-active');
+          gsap.set(inSlide, { opacity: 1 });
+          const inItems = inSlide.querySelectorAll('.anim-item');
+          const outItems = outSlide.querySelectorAll('.anim-item');
+
+          gsap.fromTo(
+            outItems,
+            { opacity: 1, y: 0 },
+            {
+              opacity: 0,
+              y: prefersReducedMotion ? 0 : -18 * direction,
+              duration: dur * 0.55,
+              stagger: 0.03,
+              ease: 'power2.in',
+              onComplete: () => {
+                outSlide.classList.remove('is-active');
+                gsap.set(outSlide, { opacity: 0 });
+                gsap.set(outItems, { clearProps: 'all' });
+              }
+            }
+          );
+
+          gsap.fromTo(
+            inItems,
+            { opacity: 0, y: prefersReducedMotion ? 0 : 24 * direction },
+            {
+              opacity: 1,
+              y: 0,
+              duration: dur * 0.75,
+              delay: dur * 0.25,
+              stagger: 0.055,
+              ease: 'power3.out',
+              onComplete: () => {
+                isTransitioning = false;
+              }
+            }
+          );
+
+          if (hasWebGL) {
+            const outGroup = slideGroups[prevIndex];
+            const inGroup = slideGroups[nextIndex];
+            inGroup.visible = true;
+            inGroup.scale.setScalar(prefersReducedMotion ? 1 : 0.86);
+
+            gsap.to(outGroup.scale, {
+              x: 1.08,
+              y: 1.08,
+              z: 1.08,
+              duration: dur * 0.5,
+              ease: 'power2.in',
+              onComplete: () => {
+                outGroup.visible = false;
+                outGroup.scale.setScalar(1);
+              }
+            });
+
+            gsap.to(inGroup.scale, {
+              x: 1,
+              y: 1,
+              z: 1,
+              duration: dur,
+              ease: 'power3.out'
+            });
+          }
+        } else {
+          outSlide.classList.remove('is-active');
+          inSlide.classList.add('is-active');
+          if (hasWebGL) {
+            slideGroups[prevIndex].visible = false;
+            slideGroups[nextIndex].visible = true;
+          }
+          isTransitioning = false;
+        }
+      }
+
+      // Navigation controls
+      btnPrev.addEventListener('click', () => goToSlide(currentSlide - 1));
+      btnNext.addEventListener('click', () => goToSlide(currentSlide + 1));
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+          e.preventDefault();
+          goToSlide(currentSlide + 1);
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          e.preventDefault();
+          goToSlide(currentSlide - 1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          goToSlide(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          goToSlide(TOTAL_SLIDES - 1);
+        }
+      });
+
+      window.addEventListener('wheel', (e) => {
+        const now = Date.now();
+        if (now < wheelLockUntil) return;
+        if (Math.abs(e.deltaY) < 28 && Math.abs(e.deltaX) < 28) return;
+        wheelLockUntil = now + 850;
+        const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+        if (delta > 0) goToSlide(currentSlide + 1);
+        else goToSlide(currentSlide - 1);
+      }, { passive: true });
+
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+
+      window.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length !== 1) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+          if (dx < 0) goToSlide(currentSlide + 1);
+          else goToSlide(currentSlide - 1);
+        }
+      }, { passive: true });
+    })();
+  </script>
+</body>
+</html>
